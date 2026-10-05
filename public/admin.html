@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — Cheese Picks</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .container { max-width: 1200px; }
+    .tabs { display: flex; gap: 6px; margin: 20px 0; flex-wrap: wrap; }
+    .tabs button {
+      border: 1px solid var(--line); background: #fff; padding: 9px 18px; border-radius: 999px;
+      cursor: pointer; font: inherit; font-weight: 600; color: var(--muted);
+    }
+    .tabs button.active { background: var(--ink); color: #f5ead8; border-color: var(--ink); }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .kpi .v { font-size: 1.8rem; font-weight: 700; font-family: "Playfair Display", serif; }
+    .kpi .l { color: var(--muted); font-size: .85rem; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+    @media (max-width: 800px) { .two { grid-template-columns: 1fr; } }
+    .bar { display: grid; grid-template-columns: 130px 1fr 70px; align-items: center; gap: 8px; margin: 6px 0; font-size: .88rem; }
+    .bar .track { background: #f1ebe1; border-radius: 6px; height: 14px; overflow: hidden; }
+    .bar .fill { background: var(--accent); height: 100%; border-radius: 6px; }
+    .bar .n { text-align: right; font-variant-numeric: tabular-nums; }
+    .bar .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    table.t { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    table.t th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 2px solid var(--line); padding: 8px 6px; }
+    table.t td { border-bottom: 1px solid var(--line); padding: 8px 6px; vertical-align: middle; }
+    table.t tr.clickable:hover { background: #fbf7f0; cursor: pointer; }
+    .tablewrap { overflow-x: auto; }
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .filters input, .filters select { width: auto; flex: 1; min-width: 160px; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(30, 20, 10, .5); display: grid; place-items: center; padding: 16px; z-index: 10; }
+    .modal { max-width: 640px; width: 100%; max-height: 90vh; overflow-y: auto; }
+    .login { max-width: 360px; margin: 80px auto; }
+    td input, td select { padding: 6px 8px; }
+    td input[type=checkbox] { width: auto; }
+    .section-h { display: flex; justify-content: space-between; align-items: center; margin: 22px 0 10px; }
+  </style>
+</head>
+<body>
+  <header class="site">
+    <div class="container">
+      <div><h1>Cheese Picks · Admin</h1><small data-i18n="adminSub"></small></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="langBox"></span><a href="/" target="_blank" style="color:#f5ead8" data-i18n="viewStore"></a> <button class="btn small ghost" id="logout" style="color:#f5ead8;border-color:#f5ead8;display:none" data-i18n="logout"></button></div>
+    </div>
+  </header>
+  <main class="container" id="app"></main>
+  <script src="i18n.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

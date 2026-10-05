@@ -1,0 +1,98 @@
+:root {
+  --bg: #faf6ef;
+  --card: #ffffff;
+  --ink: #2b2118;
+  --muted: #7a6a5a;
+  --line: #e8dfd2;
+  --accent: #8b3a3a;      /* wine */
+  --accent-soft: #f3e4e1;
+  --gold: #c9a227;
+  --ok: #2f7d4f;
+  --radius: 14px;
+  --shadow: 0 2px 12px rgba(60, 40, 20, .08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5;
+}
+h1, h2, h3 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; margin: 0 0 .4em; }
+a { color: var(--accent); }
+.container { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+header.site {
+  background: var(--ink); color: #f5ead8; padding: 18px 0;
+}
+header.site .container { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+header.site h1 { margin: 0; font-size: 1.6rem; }
+header.site small { color: #cbb89b; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  padding: 11px 20px; border-radius: 999px; font-size: 1rem; cursor: pointer; font-weight: 600;
+  text-decoration: none;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.small { padding: 6px 12px; font-size: .85rem; }
+.btn.wa { background: #25d366; border-color: #25d366; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px;
+}
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+input, select, textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  font: inherit; background: #fff; color: var(--ink);
+}
+textarea { min-height: 80px; resize: vertical; }
+label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
+.field { margin-bottom: 14px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
+
+.muted { color: var(--muted); }
+.error { background: #fde8e8; color: #8a1f1f; border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent);
+}
+.badge.new { background: #e6effc; color: #1f4f9a; }
+.badge.confirmed { background: #fff4d6; color: #8a6400; }
+.badge.preparing { background: #f3e4e1; color: #8b3a3a; }
+.badge.delivered { background: #e2f3e8; color: #2f7d4f; }
+.badge.cancelled { background: #eee; color: #777; }
+
+/* Photo header — dark wood, cheese & fruit, wine-toned overlay */
+header.site.photo {
+  position: relative; padding: 0; min-height: 300px;
+  display: flex; align-items: center; text-align: center;
+  background:
+    radial-gradient(ellipse at center, rgba(28, 18, 12, .35) 0%, rgba(20, 12, 8, .78) 75%),
+    linear-gradient(180deg, rgba(60, 20, 24, .35), rgba(20, 12, 8, .85)),
+    url("img/header-cheese.jpg") center 40% / cover no-repeat;
+  border-bottom: 3px solid var(--gold);
+}
+header.site.photo .container { justify-content: center; width: 100%; padding-top: 48px; padding-bottom: 48px; }
+header.site.photo .brand { display: flex; flex-direction: column; align-items: center; }
+header.site.photo .eyebrow {
+  font-size: .72rem; letter-spacing: .35em; text-transform: uppercase; color: var(--gold);
+}
+header.site.photo h1 {
+  font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 500; letter-spacing: .02em;
+  color: #f8efe0; text-shadow: 0 2px 18px rgba(0, 0, 0, .5); margin: 6px 0 10px;
+}
+header.site.photo .rule { width: 64px; height: 1px; background: var(--gold); margin-bottom: 12px; }
+header.site.photo small {
+  font-family: "Playfair Display", Georgia, serif; font-style: italic; font-size: 1.05rem; color: #e6d6bd;
+}
+@media (max-width: 600px) { header.site.photo { min-height: 220px; } }
+
+/* Language switch */
+.langsw { display: inline-flex; border: 1px solid #cbb89b; border-radius: 999px; overflow: hidden; }
+.langsw button { background: transparent; border: 0; color: #cbb89b; padding: 5px 11px; cursor: pointer; font: inherit; font-size: .8rem; font-weight: 600; }
+.langsw button.on { background: #f5ead8; color: var(--ink); }
+header.site.photo .langbox { position: absolute; top: 14px; right: 16px; }

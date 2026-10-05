@@ -1,0 +1,60 @@
+{
+  "settings": {
+    "businessName": "Cheese Picks",
+    "whatsappNumber": "573001234567",
+    "currencyCode": "COP",
+    "deliveryFee": 15000
+  },
+  "categories": [
+    { "id": "cheese", "name": "Quesos", "nameEn": "Cheeses", "description": "Elige los quesos de tu tabla", "descriptionEn": "Pick the cheeses for your table", "limited": true },
+    { "id": "protein", "name": "Proteínas", "nameEn": "Proteins", "description": "Carnes frías y charcutería", "descriptionEn": "Cured meats and charcuterie", "limited": true },
+    { "id": "accompaniment", "name": "Acompañamientos", "nameEn": "Accompaniments", "description": "Frutos secos, frutas, galletas, mermeladas y más", "descriptionEn": "Nuts, fruits, crackers, jams and more", "limited": true },
+    { "id": "wine", "name": "Vinos y adicionales", "nameEn": "Wines & Extras", "description": "Adicionales opcionales, se cobran aparte", "descriptionEn": "Optional add-ons, charged separately", "limited": false }
+  ],
+  "sizes": [
+    {
+      "id": "small", "name": "Pequeña", "nameEn": "Small", "serves": "2-4 personas", "servesEn": "2-4 people", "basePrice": 180000, "active": true,
+      "limits": { "cheese": 2, "protein": 1, "accompaniment": 3 }
+    },
+    {
+      "id": "medium", "name": "Mediana", "nameEn": "Medium", "serves": "6-8 personas", "servesEn": "6-8 people", "basePrice": 320000, "active": true,
+      "limits": { "cheese": 3, "protein": 2, "accompaniment": 5 }
+    },
+    {
+      "id": "large", "name": "Grande", "nameEn": "Large", "serves": "12-15 personas", "servesEn": "12-15 people", "basePrice": 550000, "active": true,
+      "limits": { "cheese": 5, "protein": 3, "accompaniment": 8 }
+    },
+    {
+      "id": "custom", "name": "Personalizada", "nameEn": "Fully Custom", "serves": "Tú decides", "servesEn": "You decide", "basePrice": 60000, "active": true,
+      "custom": true,
+      "limits": {}
+    }
+  ],
+  "products": [
+    { "id": "p1", "category": "cheese", "name": "Brie", "nameEn": "Brie", "price": 45000, "active": true },
+    { "id": "p2", "category": "cheese", "name": "Manchego añejo", "nameEn": "Aged Manchego", "price": 55000, "active": true },
+    { "id": "p3", "category": "cheese", "name": "Gouda", "nameEn": "Gouda", "price": 40000, "active": true },
+    { "id": "p4", "category": "cheese", "name": "Queso azul", "nameEn": "Blue Cheese", "price": 50000, "active": true },
+    { "id": "p5", "category": "cheese", "name": "Queso de cabra", "nameEn": "Goat Cheese", "price": 45000, "active": true },
+    { "id": "p6", "category": "cheese", "name": "Cheddar madurado", "nameEn": "Sharp Cheddar", "price": 38000, "active": true },
+    { "id": "p7", "category": "cheese", "name": "Parmesano", "nameEn": "Parmigiano Reggiano", "price": 58000, "active": true },
+    { "id": "p8", "category": "protein", "name": "Prosciutto", "nameEn": "Prosciutto", "price": 52000, "active": true },
+    { "id": "p9", "category": "protein", "name": "Salami", "nameEn": "Salami", "price": 38000, "active": true },
+    { "id": "p10", "category": "protein", "name": "Chorizo español", "nameEn": "Spanish Chorizo", "price": 42000, "active": true },
+    { "id": "p11", "category": "protein", "name": "Jamón serrano", "nameEn": "Serrano Ham", "price": 55000, "active": true },
+    { "id": "p12", "category": "accompaniment", "name": "Nueces", "nameEn": "Walnuts", "price": 18000, "active": true },
+    { "id": "p13", "category": "accompaniment", "name": "Almendras", "nameEn": "Almonds", "price": 18000, "active": true },
+    { "id": "p14", "category": "accompaniment", "name": "Uvas", "nameEn": "Grapes", "price": 12000, "active": true },
+    { "id": "p15", "category": "accompaniment", "name": "Higos", "nameEn": "Figs", "price": 20000, "active": true },
+    { "id": "p16", "category": "accompaniment", "name": "Galletas artesanales", "nameEn": "Artisan Crackers", "price": 14000, "active": true },
+    { "id": "p17", "category": "accompaniment", "name": "Miel", "nameEn": "Honey", "price": 15000, "active": true },
+    { "id": "p18", "category": "accompaniment", "name": "Mermelada de higos", "nameEn": "Fig Jam", "price": 16000, "active": true },
+    { "id": "p19", "category": "accompaniment", "name": "Aceitunas", "nameEn": "Olives", "price": 16000, "active": true },
+    { "id": "p20", "category": "accompaniment", "name": "Chocolate oscuro", "nameEn": "Dark Chocolate", "price": 20000, "active": true },
+    { "id": "p21", "category": "wine", "name": "Cabernet Sauvignon (botella)", "nameEn": "Cabernet Sauvignon (bottle)", "price": 95000, "active": true },
+    { "id": "p22", "category": "wine", "name": "Malbec (botella)", "nameEn": "Malbec (bottle)", "price": 85000, "active": true },
+    { "id": "p23", "category": "wine", "name": "Sauvignon Blanc (botella)", "nameEn": "Sauvignon Blanc (bottle)", "price": 80000, "active": true },
+    { "id": "p24", "category": "wine", "name": "Prosecco (botella)", "nameEn": "Prosecco (bottle)", "price": 75000, "active": true },
+    { "id": "p25", "category": "wine", "name": "Alquiler de copas (x6)", "nameEn": "Wine glasses rental (x6)", "price": 30000, "active": true }
+  ]
+}

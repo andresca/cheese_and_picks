@@ -1,0 +1,293 @@
+// Customer ordering wizard (uses i18n.js: t, tr, LANG, setLang, formatMoney)
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let catalog;
+let done = false; // order submitted
+const state = {
+  step: 0,
+  sizeId: null,
+  selected: new Set(),
+  fulfillment: 'delivery',
+  customer: { name: '', phone: '', email: '', address: '', date: '', time: '', occasion: '', notes: '' },
+};
+
+const money = n => formatMoney(n, catalog.settings.currencyCode);
+const size = () => catalog.sizes.find(s => s.id === state.sizeId);
+const product = id => catalog.products.find(p => p.id === id);
+const selectedIn = cat => [...state.selected].map(product).filter(p => p && p.category === cat);
+
+// Steps: size, one per category, details, summary
+function steps() {
+  return [
+    { key: 'size', label: t('stepSize') },
+    ...catalog.categories.map(c => ({ key: 'cat', cat: c, label: tr(c) })),
+    { key: 'details', label: t('stepDetails') },
+    { key: 'summary', label: t('stepSummary') },
+  ];
+}
+
+function limitFor(cat) {
+  const s = size();
+  if (!s || s.custom || !cat.limited) return Infinity;
+  return s.limits[cat.id] ?? 0;
+}
+
+function itemPrice(p) {
+  const s = size();
+  const cat = catalog.categories.find(c => c.id === p.category);
+  return s && !s.custom && cat?.limited ? 0 : p.price;
+}
+
+function totals() {
+  const s = size();
+  if (!s) return { subtotal: 0, delivery: 0, total: 0 };
+  const subtotal = s.basePrice + [...state.selected].map(product).filter(Boolean).reduce((sum, p) => sum + itemPrice(p), 0);
+  const delivery = state.fulfillment === 'delivery' ? Number(catalog.settings.deliveryFee) || 0 : 0;
+  return { subtotal, delivery, total: subtotal + delivery };
+}
+
+// ---------- rendering ----------
+function render() {
+  const st = steps();
+  document.getElementById('stepper').innerHTML = st.map((s, i) =>
+    `<div class="s ${i < state.step ? 'done' : ''} ${i === state.step ? 'active' : ''}">${i + 1}. ${esc(s.label)}</div>`).join('');
+  const cur = st[state.step];
+  const body = document.getElementById('stepBody');
+  if (cur.key === 'size') body.innerHTML = renderSize();
+  else if (cur.key === 'cat') body.innerHTML = renderCategory(cur.cat);
+  else if (cur.key === 'details') body.innerHTML = renderDetails();
+  else body.innerHTML = renderSummary();
+  renderCart();
+  bind(cur);
+}
+
+function navButtons(nextLabel = t('next'), nextDisabled = false) {
+  return `<div class="nav">
+    ${state.step > 0 ? `<button class="btn ghost" data-act="back">${t('back')}</button>` : '<span></span>'}
+    <button class="btn" data-act="next" ${nextDisabled ? 'disabled' : ''}>${nextLabel}</button>
+  </div>`;
+}
+
+function renderSize() {
+  const cats = catalog.categories.filter(c => c.limited);
+  return `<h2>1. ${t('chooseSize')}</h2>
+    <p class="muted">${t('chooseSizeHelp')}</p>
+    <div class="grid">
+      ${catalog.sizes.map(s => `
+        <div class="option size-card ${state.sizeId === s.id ? 'selected' : ''}" data-size="${esc(s.id)}">
+          <span class="check">✓</span>
+          <h3>${esc(tr(s))}</h3>
+          <div class="muted">${esc(tr(s, 'serves'))}</div>
+          <div class="price">${s.custom ? t('from') : ''}${money(s.basePrice)}</div>
+          <ul>
+            ${s.custom
+              ? `<li>${t('noLimits')}</li><li>${t('perItem')}</li>`
+              : cats.map(c => `<li>${esc(t('upTo', { n: s.limits[c.id] ?? 0, cat: tr(c).toLowerCase() }))}</li>`).join('')}
+          </ul>
+        </div>`).join('')}
+    </div>
+    ${navButtons(t('next'), !state.sizeId)}`;
+}
+
+function renderCategory(cat) {
+  const items = catalog.products.filter(p => p.category === cat.id);
+  const limit = limitFor(cat);
+  const count = selectedIn(cat.id).length;
+  const full = count >= limit;
+  return `<h2>${state.step + 1}. ${esc(tr(cat))}</h2>
+    <p class="muted">${esc(tr(cat, 'description'))}</p>
+    <div class="counter">${limit === Infinity
+      ? t('selected', { n: count }) + (cat.limited ? '' : t('optionalPriced'))
+      : t('ofSelected', { n: count, max: limit }) + (full ? t('limitReached') : '')}</div>
+    <div class="grid">
+      ${items.length ? items.map(p => {
+        const sel = state.selected.has(p.id);
+        const price = itemPrice(p);
+        return `<div class="option ${sel ? 'selected' : ''} ${!sel && full ? 'disabled' : ''}" data-item="${esc(p.id)}">
+          <span class="check">✓</span>
+          <div style="font-weight:600;padding-right:26px">${esc(tr(p))}</div>
+          <div class="${price ? 'price' : 'muted'}">${price ? '+' + money(price) : t('included')}</div>
+        </div>`;
+      }).join('') : `<p class="muted">${t('noItems')}</p>`}
+    </div>
+    ${navButtons(count === 0 ? t('skip') : t('next'))}`;
+}
+
+function renderDetails() {
+  const c = state.customer;
+  const today = new Date().toISOString().slice(0, 10);
+  const f = (id, label, type = 'text', extra = '') =>
+    `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(c[id])}" ${extra}></div>`;
+  return `<h2>${state.step + 1}. ${t('stepDetails')}</h2>
+    <div class="seg">
+      <div class="option ${state.fulfillment === 'delivery' ? 'selected' : ''}" data-ful="delivery">🚚 ${t('delivery')} (+${money(catalog.settings.deliveryFee)})</div>
+      <div class="option ${state.fulfillment === 'pickup' ? 'selected' : ''}" data-ful="pickup">🏠 ${t('pickup')}</div>
+    </div>
+    <div class="row2">${f('name', t('fullName'))}${f('phone', t('phone'), 'tel')}</div>
+    ${f('email', t('email'), 'email')}
+    ${state.fulfillment === 'delivery' ? f('address', t('address')) : ''}
+    <div class="row2">${f('date', t('eventDate'), 'date', `min="${today}"`)}${f('time', t('time'), 'time')}</div>
+    ${f('occasion', t('occasion'))}
+    <div class="field"><label for="notes">${t('notes')}</label><textarea id="notes">${esc(c.notes)}</textarea></div>
+    <div id="formErr"></div>
+    ${navButtons(t('review'))}`;
+}
+
+function renderSummary() {
+  const s = size(), tt = totals(), c = state.customer;
+  const rows = catalog.categories.map(cat => {
+    const items = selectedIn(cat.id);
+    if (!items.length) return '';
+    return `<tr><td colspan="2" style="padding-top:14px"><b>${esc(tr(cat))}</b></td></tr>` +
+      items.map(p => `<tr><td>${esc(tr(p))}</td><td>${itemPrice(p) ? money(itemPrice(p)) : `<span class="muted">${t('included')}</span>`}</td></tr>`).join('');
+  }).join('');
+  const tableName = LANG === 'en' ? `${esc(tr(s))} ${t('table')}` : `${t('table')} ${esc(tr(s))}`;
+  return `<div class="summary">
+    <h2>${state.step + 1}. ${t('summaryTitle')}</h2>
+    <table>
+      <tr><td><b>${tableName}</b> <span class="muted">(${esc(tr(s, 'serves'))})</span></td><td>${money(s.basePrice)}</td></tr>
+      ${rows}
+      <tr><td style="padding-top:14px">${t('subtotal')}</td><td style="padding-top:14px">${money(tt.subtotal)}</td></tr>
+      ${tt.delivery ? `<tr><td>${t('deliveryFee')}</td><td>${money(tt.delivery)}</td></tr>` : ''}
+      <tr><td><b>${t('total')}</b></td><td><b>${money(tt.total)}</b></td></tr>
+    </table>
+    <h3 style="margin-top:22px">${t('customer')}</h3>
+    <p>
+      <b>${esc(c.name)}</b> · ${esc(c.phone)}${c.email ? ' · ' + esc(c.email) : ''}<br>
+      ${state.fulfillment === 'delivery' ? '🚚 ' + t('deliveryTo') + ' ' + esc(c.address) : '🏠 ' + t('pickup')}<br>
+      📅 ${esc(c.date)} ${esc(c.time)}${c.occasion ? '<br>🎉 ' + esc(c.occasion) : ''}
+      ${c.notes ? '<br>📝 ' + esc(c.notes) : ''}
+    </p>
+    <p class="muted">${t('confirmHelp')}</p>
+    <div id="formErr"></div>
+    ${navButtons(t('confirm'))}
+  </div>`;
+}
+
+function renderCart() {
+  const s = size();
+  const el = document.getElementById('cart');
+  if (!s) { el.innerHTML = `<h3>${t('yourTable')}</h3><p class="muted">${t('chooseToStart')}</p>`; return; }
+  const tt = totals();
+  const atEnd = state.step >= steps().length - 2;
+  el.innerHTML = `<h3>${t('yourTable')}</h3>
+    <div class="line"><span>${esc(tr(s))}</span><span>${money(s.basePrice)}</span></div>
+    ${catalog.categories.map(cat => {
+      const items = selectedIn(cat.id);
+      if (!items.length) return '';
+      const lim = limitFor(cat);
+      return `<div class="cat">${esc(tr(cat))}${lim !== Infinity ? ` (${items.length}/${lim})` : ''}</div>` +
+        items.map(p => `<div class="line"><span>${esc(tr(p))}</span><span>${itemPrice(p) ? money(itemPrice(p)) : '✓'}</span></div>`).join('');
+    }).join('')}
+    ${tt.delivery && atEnd ? `<div class="line" style="margin-top:8px"><span>${t('deliveryFee')}</span><span>${money(tt.delivery)}</span></div>` : ''}
+    <div class="line total"><span>${t('total')}</span><span>${money(atEnd ? tt.total : tt.subtotal)}</span></div>`;
+}
+
+// ---------- events ----------
+function bind(cur) {
+  const body = document.getElementById('stepBody');
+  body.querySelectorAll('[data-size]').forEach(el => el.onclick = () => {
+    const newId = el.dataset.size;
+    if (newId !== state.sizeId) {
+      state.sizeId = newId;
+      // trim selections that exceed the new size's limits
+      catalog.categories.forEach(cat => {
+        const lim = limitFor(cat);
+        selectedIn(cat.id).slice(lim).forEach(p => state.selected.delete(p.id));
+      });
+    }
+    render();
+  });
+  body.querySelectorAll('[data-item]').forEach(el => el.onclick = () => {
+    const id = el.dataset.item;
+    if (state.selected.has(id)) state.selected.delete(id);
+    else {
+      const cat = catalog.categories.find(c => c.id === product(id).category);
+      if (selectedIn(cat.id).length >= limitFor(cat)) return;
+      state.selected.add(id);
+    }
+    render();
+  });
+  body.querySelectorAll('[data-ful]').forEach(el => el.onclick = () => { saveForm(); state.fulfillment = el.dataset.ful; render(); });
+  body.querySelectorAll('input, textarea').forEach(el => el.oninput = () => { state.customer[el.id] = el.value; });
+
+  const back = body.querySelector('[data-act=back]');
+  if (back) back.onclick = () => { saveForm(); state.step--; render(); scrollTo({ top: 0, behavior: 'smooth' }); };
+  const next = body.querySelector('[data-act=next]');
+  next.onclick = async () => {
+    if (cur.key === 'details') {
+      saveForm();
+      const err = validate();
+      if (err) { document.getElementById('formErr').innerHTML = `<div class="error">${esc(err)}</div>`; return; }
+    }
+    if (cur.key === 'cat' && isLastCategory(cur.cat) && state.selected.size === 0) {
+      alert(t('errEmpty')); return;
+    }
+    if (cur.key === 'summary') return submit(next);
+    state.step++;
+    render();
+    scrollTo({ top: 0, behavior: 'smooth' });
+  };
+}
+
+const isLastCategory = cat => catalog.categories[catalog.categories.length - 1].id === cat.id;
+
+function saveForm() {
+  document.querySelectorAll('#stepBody input, #stepBody textarea').forEach(el => { state.customer[el.id] = el.value; });
+}
+
+function validate() {
+  const c = state.customer;
+  if (!c.name.trim()) return t('errName');
+  if (!/^[+\d\s()-]{7,}$/.test(c.phone.trim())) return t('errPhone');
+  if (state.fulfillment === 'delivery' && !c.address.trim()) return t('errAddress');
+  if (!c.date) return t('errDate');
+  return null;
+}
+
+async function submit(btn) {
+  btn.disabled = true;
+  btn.textContent = t('sending');
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: LANG, sizeId: state.sizeId, itemIds: [...state.selected], fulfillment: state.fulfillment, customer: state.customer }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error');
+    window.open(data.whatsappUrl, '_blank');
+    done = true;
+    document.getElementById('cart').style.display = 'none';
+    document.getElementById('stepBody').innerHTML = `<div class="success">
+      <div class="big">🧀🍷</div>
+      <h2>${esc(t('thanks', { name: state.customer.name }))}</h2>
+      <p>${t('registered', { id: esc(data.order.id), total: money(data.order.total) })}</p>
+      <p class="muted">${t('waFallback')}</p>
+      <a class="btn wa" href="${esc(data.whatsappUrl)}" target="_blank" rel="noopener">${t('sendWa')}</a>
+      <p style="margin-top:20px"><a href="/">${t('newOrder')}</a></p>
+    </div>`;
+  } catch (e) {
+    document.getElementById('formErr').innerHTML = `<div class="error">${esc(e.message)}</div>`;
+    btn.disabled = false;
+    btn.textContent = t('confirm');
+  }
+}
+
+(async function init() {
+  catalog = await (await fetch('/api/catalog')).json();
+  document.getElementById('bizName').textContent = catalog.settings.businessName;
+  const box = document.getElementById('langBox');
+  box.innerHTML = langSwitcher();
+  const applyLang = l => {
+    setLang(l);
+    document.title = `${catalog.settings.businessName} — ${t('heroTitle')}`;
+  };
+  box.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => {
+    saveForm();
+    applyLang(b.dataset.lang);
+    if (!done) render();
+  });
+  applyLang(LANG);
+  render();
+})();
