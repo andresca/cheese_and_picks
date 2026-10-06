@@ -22,7 +22,10 @@ export async function verifyAccess(request, env) {
   try {
     const { payload } = await jwtVerify(token, jwksByTeam.get(team), { issuer: `https://${team}`, audience: aud });
     return { ok: true, email: payload.email };
-  } catch {
-    return { ok: false, status: 403, error: 'Invalid Cloudflare Access token' };
+  } catch (e) {
+    // Show which check failed (e.g. "aud" or "iss" mismatch); no secrets are included.
+    const reason = e.claim ? `${e.claim} mismatch` : (e.code || e.message);
+    console.error('Access JWT rejected:', e.code, e.claim, e.message);
+    return { ok: false, status: 403, error: `Invalid Cloudflare Access token (${reason})` };
   }
 }
