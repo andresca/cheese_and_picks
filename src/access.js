@@ -20,7 +20,13 @@ export async function verifyAccess(request, env) {
 
   if (!jwksByTeam.has(team)) jwksByTeam.set(team, createRemoteJWKSet(new URL(`https://${team}/cdn-cgi/access/certs`)));
   try {
-    const { payload } = await jwtVerify(token, jwksByTeam.get(team), { issuer: `https://${team}`, audience: aud });
+    // The signature check against this team's keys proves who issued the token; the issuer is
+    // compared loosely because its spelling (scheme, trailing slash, case) can vary.
+    const { payload } = await jwtVerify(token, jwksByTeam.get(team), { audience: aud });
+    const iss = String(payload.iss || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (iss !== team.toLowerCase()) {
+      return { ok: false, status: 403, error: `Invalid Cloudflare Access token (issuer "${payload.iss}", expected "https://${team}")` };
+    }
     return { ok: true, email: payload.email };
   } catch (e) {
     // Show which check failed (e.g. "aud" or "iss" mismatch); no secrets are included.
