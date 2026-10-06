@@ -29,8 +29,6 @@ simple = { limit = 5, period = 60 }
 [vars]
 # From Zero Trust → Settings → Custom pages: "<team>.cloudflareaccess.com"
 ACCESS_TEAM_DOMAIN = "websportal.cloudflareaccess.com"
-# Issuer written into the tokens (the team's original domain); defaults to ACCESS_TEAM_DOMAIN.
-ACCESS_ISSUER = "black-tooth-6072.cloudflareaccess.com"
 # From Zero Trust → Access → Applications → Cheese Picks Admin → Overview → "Application Audience (AUD) Tag"
 ACCESS_AUD = "e0cd353a5a75a4cd7c6c4013c71d7c5141740af4a69f73cbae9578728eec5ac9"
 

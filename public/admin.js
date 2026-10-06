@@ -33,7 +33,9 @@ async function api(path, opts = {}) {
 }
 
 // Ends the Cloudflare Access session; the next visit asks for a new email code.
-document.getElementById('logout').onclick = () => { location.href = '/cdn-cgi/access/logout'; };
+// The team-domain logout is used because the app-domain one (/cdn-cgi/access/logout) still points at the
+// team's old name after the rename and shows "Unable to find your Access organization".
+document.getElementById('logout').onclick = () => { location.href = 'https://websportal.cloudflareaccess.com/cdn-cgi/access/logout'; };
 
 // language switch in header
 const langBox = document.getElementById('langBox');
@@ -47,9 +49,15 @@ setLang(LANG);
 // ---------- signed out / session expired ----------
 function renderSignedOut(detail) {
   document.getElementById('logout').style.display = 'none';
-  app.innerHTML = `<div class="card login">
+  // With a detail the email login worked but the API refused it (config problem); without one the Access session expired.
+  app.innerHTML = detail
+    ? `<div class="card login">
+    <h2>${t('accessDenied')}</h2>
+    <p class="muted">${t('accessDeniedHelp')}</p><div class="error">${esc(detail)}</div>
+    <button class="btn" style="width:100%" id="relogin">${t('retry')}</button></div>`
+    : `<div class="card login">
     <h2>${t('login')}</h2>
-    <p class="muted">${t('sessionExpired')}</p>${detail ? `<div class="error">${esc(detail)}</div>` : ''}
+    <p class="muted">${t('sessionExpired')}</p>
     <button class="btn" style="width:100%" id="relogin">${t('enter')}</button></div>`;
   document.getElementById('relogin').onclick = () => location.reload();
 }

@@ -35,6 +35,7 @@ const I18N = {
     // admin
     adminSub: 'Pedidos, estadísticas y catálogo', viewStore: 'Ver tienda ↗', logout: 'Cerrar sesión',
     login: 'Ingreso administrador', sessionExpired: 'Tu sesión terminó. Ingresa de nuevo con el código que llega a tu correo.', enter: 'Ingresar',
+    accessDenied: 'No se pudo abrir el panel', accessDeniedHelp: 'Cloudflare validó tu correo, pero el servidor rechazó el acceso:', retry: 'Reintentar',
     tabDashboard: '📊 Panel', tabOrders: '🧾 Pedidos', tabCatalog: '🧀 Catálogo', tabSettings: '⚙️ Ajustes',
     loading: 'Cargando…', noData: 'Aún no hay datos.',
     kTotal: 'Pedidos totales', kRevenue: 'Ventas (sin cancelados)', kAvg: 'Pedido promedio', kOpen: 'Pedidos por atender',
@@ -122,6 +123,7 @@ const I18N = {
     sendWa: 'Send order via WhatsApp', newOrder: 'Start a new order',
     adminSub: 'Orders, statistics and catalog', viewStore: 'View store ↗', logout: 'Log out',
     login: 'Admin login', sessionExpired: 'Your session ended. Sign in again with the code sent to your email.', enter: 'Log in',
+    accessDenied: 'Could not open the admin', accessDeniedHelp: 'Cloudflare verified your email, but the server rejected access:', retry: 'Try again',
     tabDashboard: '📊 Dashboard', tabOrders: '🧾 Orders', tabCatalog: '🧀 Catalog', tabSettings: '⚙️ Settings',
     loading: 'Loading…', noData: 'No data yet.',
     kTotal: 'Total orders', kRevenue: 'Revenue (excl. cancelled)', kAvg: 'Average order', kOpen: 'Open orders to fulfil',
