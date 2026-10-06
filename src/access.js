@@ -24,8 +24,9 @@ export async function verifyAccess(request, env) {
     // compared loosely because its spelling (scheme, trailing slash, case) can vary.
     const { payload } = await jwtVerify(token, jwksByTeam.get(team), { audience: aud });
     const iss = String(payload.iss || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-    if (iss !== team.toLowerCase()) {
-      return { ok: false, status: 403, error: `Invalid Cloudflare Access token (issuer "${payload.iss}", expected "https://${team}")` };
+    const expected = (env.ACCESS_ISSUER || team).toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (iss !== expected) {
+      return { ok: false, status: 403, error: `Invalid Cloudflare Access token (issuer "${payload.iss}", expected "https://${expected}")` };
     }
     return { ok: true, email: payload.email };
   } catch (e) {
