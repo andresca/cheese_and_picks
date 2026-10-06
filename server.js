@@ -1,26 +1,27 @@
+require('dotenv').config();
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const DATA_DIR = path.join(__dirname, 'data');
-const CATALOG_FILE = path.join(DATA_DIR, 'catalog.json');
-const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const SESSION_HOURS = 12;
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const STATUSES = ['new', 'confirmed', 'preparing', 'delivered', 'cancelled'];
 
-// ---------- storage ----------
-function readJson(file, fallback) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
+if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is not set (see .env.example)'); process.exit(1); }
+if (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 12) {
+  console.error('ADMIN_PASSWORD must be set and at least 12 characters long (see .env.example)');
+  process.exit(1);
 }
-function writeJson(file, data) {
-  const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, file);
-}
-const getCatalog = () => readJson(CATALOG_FILE, null);
-const getOrders = () => readJson(ORDERS_FILE, []);
+
+const sha256 = s => crypto.createHash('sha256').update(String(s)).digest();
+const { getCatalog } = db;
+// Wraps async handlers so rejected promises reach the error handler.
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ---------- i18n ----------
 const MSG = {
@@ -144,24 +145,62 @@ function buildWhatsappText(order, catalog) {
 
 // ---------- app ----------
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.set('trust proxy', 1); // correct client IPs for rate limiting behind a host's proxy
+app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
+
+// CORS only for the explicitly allowed origins (e.g. the static GitHub Pages front end).
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.set({
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE',
+      Vary: 'Origin',
+    });
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
+
+app.use(express.json({ limit: '200kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+const apiLimiter = rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
+const orderLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false,
+  message: { error: 'Too many orders from this connection, please try again later' } });
+const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false,
+  skipSuccessfulRequests: true, message: { error: 'Too many login attempts, try again in 15 minutes' } });
+app.use('/api', apiLimiter);
+
 // Public catalog (only active entries)
-app.get('/api/catalog', (req, res) => {
-  const cat = getCatalog();
+app.get('/api/catalog', wrap(async (req, res) => {
+  const cat = await getCatalog();
   res.json({
     settings: { businessName: cat.settings.businessName, currencyCode: cat.settings.currencyCode || 'COP', deliveryFee: cat.settings.deliveryFee },
     categories: cat.categories,
     sizes: cat.sizes.filter(s => s.active),
     products: cat.products.filter(p => p.active),
   });
-});
+}));
 
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', orderLimiter, async (req, res) => {
   const lang = (req.body || {}).lang === 'en' ? 'en' : 'es';
   try {
-    const catalog = getCatalog();
+    const catalog = await getCatalog();
     const { sizeId, itemIds, customer = {}, fulfillment } = req.body || {};
     const str = v => (typeof v === 'string' ? v.trim().slice(0, 500) : '');
     const cu = {
@@ -188,9 +227,7 @@ app.post('/api/orders', (req, res) => {
       total: priced.subtotal + deliveryFee,
       customer: cu,
     };
-    const orders = getOrders();
-    orders.push(order);
-    writeJson(ORDERS_FILE, orders);
+    await db.saveOrder(order);
 
     const text = buildWhatsappText(order, catalog);
     const whatsappUrl = `https://wa.me/${catalog.settings.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
@@ -202,29 +239,33 @@ app.post('/api/orders', (req, res) => {
 });
 
 // ---------- admin ----------
-const sessions = new Set();
-app.post('/api/admin/login', (req, res) => {
+// Sessions: random token given to the browser, only its SHA-256 hash is stored, expires after SESSION_HOURS.
+const bearer = req => (req.headers.authorization || '').replace(/^Bearer /, '');
+app.post('/api/admin/login', loginLimiter, wrap(async (req, res) => {
   const pw = String((req.body || {}).password || '');
-  const ok = pw.length === ADMIN_PASSWORD.length &&
-    crypto.timingSafeEqual(Buffer.from(pw), Buffer.from(ADMIN_PASSWORD));
-  if (!ok) return res.status(401).json({ error: 'Wrong password' });
-  const token = crypto.randomBytes(24).toString('hex');
-  sessions.add(token);
-  res.json({ token });
-});
-function requireAdmin(req, res, next) {
-  const token = (req.headers.authorization || '').replace('Bearer ', '');
-  if (!sessions.has(token)) return res.status(401).json({ error: 'Unauthorized' });
+  // Hash both sides so the comparison is constant-time and doesn't leak the password length.
+  if (!crypto.timingSafeEqual(sha256(pw), sha256(ADMIN_PASSWORD))) return res.status(401).json({ error: 'Wrong password' });
+  const token = crypto.randomBytes(32).toString('hex');
+  await db.createSession(sha256(token).toString('hex'), SESSION_HOURS);
+  res.json({ token, expiresInHours: SESSION_HOURS });
+}));
+app.post('/api/admin/logout', wrap(async (req, res) => {
+  await db.deleteSession(sha256(bearer(req)).toString('hex'));
+  res.json({ ok: true });
+}));
+const requireAdmin = wrap(async (req, res, next) => {
+  const token = bearer(req);
+  if (!token || !(await db.isValidSession(sha256(token).toString('hex')))) return res.status(401).json({ error: 'Unauthorized' });
+  res.set('Cache-Control', 'no-store');
   next();
-}
-
-app.get('/api/admin/orders', requireAdmin, (req, res) => {
-  res.json(getOrders().sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
 });
 
-app.patch('/api/admin/orders/:id', requireAdmin, (req, res) => {
-  const orders = getOrders();
-  const o = orders.find(x => x.id === req.params.id);
+app.get('/api/admin/orders', requireAdmin, wrap(async (req, res) => {
+  res.json(await db.getOrders());
+}));
+
+app.patch('/api/admin/orders/:id', requireAdmin, wrap(async (req, res) => {
+  const o = await db.getOrder(req.params.id);
   if (!o) return res.status(404).json({ error: 'Not found' });
   const { status, adminNotes } = req.body || {};
   if (status !== undefined) {
@@ -233,20 +274,17 @@ app.patch('/api/admin/orders/:id', requireAdmin, (req, res) => {
   }
   if (adminNotes !== undefined) o.adminNotes = String(adminNotes).slice(0, 2000);
   o.updatedAt = new Date().toISOString();
-  writeJson(ORDERS_FILE, orders);
+  await db.saveOrder(o);
   res.json(o);
-});
+}));
 
-app.delete('/api/admin/orders/:id', requireAdmin, (req, res) => {
-  const orders = getOrders();
-  const next = orders.filter(x => x.id !== req.params.id);
-  if (next.length === orders.length) return res.status(404).json({ error: 'Not found' });
-  writeJson(ORDERS_FILE, next);
+app.delete('/api/admin/orders/:id', requireAdmin, wrap(async (req, res) => {
+  if (!(await db.deleteOrder(req.params.id))) return res.status(404).json({ error: 'Not found' });
   res.json({ ok: true });
-});
+}));
 
-app.get('/api/admin/stats', requireAdmin, (req, res) => {
-  const all = getOrders();
+app.get('/api/admin/stats', requireAdmin, wrap(async (req, res) => {
+  const all = await db.getOrders();
   const valid = all.filter(o => o.status !== 'cancelled');
   const revenue = valid.reduce((s, o) => s + o.total, 0);
   const byStatus = Object.fromEntries(STATUSES.map(s => [s, all.filter(o => o.status === s).length]));
@@ -285,11 +323,11 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
     byMonth: Object.entries(byMonth).sort().map(([month, v]) => ({ month, ...v })),
     byWeekday,
   });
-});
+}));
 
-app.get('/api/admin/catalog', requireAdmin, (req, res) => res.json(getCatalog()));
+app.get('/api/admin/catalog', requireAdmin, wrap(async (req, res) => res.json(await getCatalog())));
 
-app.put('/api/admin/catalog', requireAdmin, (req, res) => {
+app.put('/api/admin/catalog', requireAdmin, wrap(async (req, res) => {
   const c = req.body;
   if (!c || !c.settings || !Array.isArray(c.sizes) || !Array.isArray(c.products) || !Array.isArray(c.categories)) {
     return res.status(400).json({ error: 'Invalid catalog' });
@@ -300,14 +338,26 @@ app.put('/api/admin/catalog', requireAdmin, (req, res) => {
     for (const k of Object.keys(s.limits || {})) s.limits[k] = Math.max(0, parseInt(s.limits[k]) || 0);
   });
   c.settings.deliveryFee = Number(c.settings.deliveryFee) || 0;
-  writeJson(CATALOG_FILE, c);
+  await db.saveCatalog(c);
   res.json(c);
-});
+}));
 
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-app.listen(PORT, () => {
-  console.log(`Cheese Picks running at http://localhost:${PORT}`);
-  console.log(`Admin console:      http://localhost:${PORT}/admin`);
-  if (!process.env.ADMIN_PASSWORD) console.log('WARNING: using default admin password "admin123". Set ADMIN_PASSWORD env var.');
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') return res.status(400).json({ error: 'Invalid request body' });
+  console.error(err);
+  res.status(500).json({ error: 'Server error' });
+});
+
+db.init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Cheese Picks running at http://localhost:${PORT}`);
+    console.log(`Admin console:      http://localhost:${PORT}/admin`);
+  });
+}).catch(err => {
+  console.error('Could not connect to the database:', err.message);
+  process.exit(1);
 });

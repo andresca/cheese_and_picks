@@ -25,6 +25,7 @@ async function api(path, opts = {}) {
 }
 
 function logout() {
+  if (token) fetch('/api/admin/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
   token = null;
   sessionStorage.removeItem('adminToken');
   renderLogin();
