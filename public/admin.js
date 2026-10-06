@@ -56,7 +56,11 @@ function renderSignedOut(detail) {
 
 async function start() {
   document.getElementById('logout').style.display = '';
-  try { catalog = await api('/api/admin/catalog'); } catch { return; }
+  try { catalog = await api('/api/admin/catalog'); } catch (e) {
+    // 401/403 already rendered the signed-out card; anything else (e.g. API misconfigured) would leave a blank page.
+    if (!app.innerHTML.trim()) app.innerHTML = `<div class="card login"><div class="error">${esc(e.message)}</div></div>`;
+    return;
+  }
   renderShell();
 }
 
