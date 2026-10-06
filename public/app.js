@@ -254,7 +254,7 @@ async function submit(btn) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lang: LANG, sizeId: state.sizeId, itemIds: [...state.selected], fulfillment: state.fulfillment, customer: state.customer }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({ error: 'Online ordering is not available yet' }));
     if (!res.ok) throw new Error(data.error || 'Error');
     window.open(data.whatsappUrl, '_blank');
     done = true;
@@ -275,7 +275,9 @@ async function submit(btn) {
 }
 
 (async function init() {
-  catalog = await (await fetch('/api/catalog')).json();
+  // Static hosting (GitHub Pages) has no API; fall back to the prebuilt catalog.json
+  const apiRes = await fetch('/api/catalog').catch(() => null);
+  catalog = apiRes && apiRes.ok ? await apiRes.json() : await (await fetch('catalog.json')).json();
   document.getElementById('bizName').textContent = catalog.settings.businessName;
   const box = document.getElementById('langBox');
   box.innerHTML = langSwitcher();
