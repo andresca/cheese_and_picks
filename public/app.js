@@ -26,25 +26,47 @@ function steps() {
   ];
 }
 
+const bounded = (s, cat) => s && !s.custom && cat.limited;
+// Max included items (Infinity = no cap). Sizes that allow extras never block, they charge instead.
 function limitFor(cat) {
   const s = size();
-  if (!s || s.custom || !cat.limited) return Infinity;
-  return s.limits[cat.id] ?? 0;
+  return bounded(s, cat) ? s.limits[cat.id] ?? 0 : Infinity;
 }
+const minFor = cat => bounded(size(), cat) ? Math.min(size().mins?.[cat.id] ?? 0, limitFor(cat)) : 0;
+const canAdd = cat => size()?.allowExtras || selectedIn(cat.id).length < limitFor(cat);
 
+// Same rule as the server: the most expensive picks fill the included slots and pay only
+// their surcharge; anything beyond the limit pays full price.
 function itemPrice(p) {
   const s = size();
   const cat = catalog.categories.find(c => c.id === p.category);
-  return s && !s.custom && cat?.limited ? 0 : p.price;
+  if (!bounded(s, cat)) return p.price;
+  const rank = selectedIn(cat.id).sort((x, y) => y.price - x.price).findIndex(x => x.id === p.id);
+  return rank !== -1 && rank < limitFor(cat) ? p.surcharge || 0 : p.price;
+}
+// Price shown on a card that isn't selected yet: what it would cost if added now.
+function nextPrice(p) {
+  const cat = catalog.categories.find(c => c.id === p.category);
+  if (!bounded(size(), cat)) return p.price;
+  return selectedIn(cat.id).length < limitFor(cat) ? p.surcharge || 0 : p.price;
+}
+
+function deliveryFor(subtotal) {
+  const st = catalog.settings;
+  if (state.fulfillment !== 'delivery') return 0;
+  if (st.freeDeliveryFrom && subtotal >= st.freeDeliveryFrom) return 0;
+  return Number(st.deliveryFee) || 0;
 }
 
 function totals() {
   const s = size();
   if (!s) return { subtotal: 0, delivery: 0, total: 0 };
   const subtotal = s.basePrice + [...state.selected].map(product).filter(Boolean).reduce((sum, p) => sum + itemPrice(p), 0);
-  const delivery = state.fulfillment === 'delivery' ? Number(catalog.settings.deliveryFee) || 0 : 0;
+  const delivery = deliveryFor(subtotal);
   return { subtotal, delivery, total: subtotal + delivery };
 }
+
+const isoDay = offset => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 
 // ---------- rendering ----------
 function render() {
@@ -79,10 +101,14 @@ function renderSize() {
           <h3>${esc(tr(s))}</h3>
           <div class="muted">${esc(tr(s, 'serves'))}</div>
           <div class="price">${s.custom ? t('from') : ''}${money(s.basePrice)}</div>
+          ${tr(s, 'description') ? `<p class="muted" style="margin:6px 0 0">${esc(tr(s, 'description'))}</p>` : ''}
           <ul>
             ${s.custom
               ? `<li>${t('noLimits')}</li><li>${t('perItem')}</li>`
-              : cats.map(c => `<li>${esc(t('upTo', { n: s.limits[c.id] ?? 0, cat: tr(c).toLowerCase() }))}</li>`).join('')}
+              : cats.map(c => {
+                const max = s.limits[c.id] ?? 0, min = Math.min(s.mins?.[c.id] ?? 0, max), cat = tr(c).toLowerCase();
+                return `<li>${esc(min && min === max ? t('exactly', { n: max, cat }) : min ? t('between', { min, max, cat }) : t('upTo', { n: max, cat }))}</li>`;
+              }).join('') + (s.allowExtras ? `<li>${t('extrasAllowed')}</li>` : '')}
           </ul>
         </div>`).join('')}
     </div>
@@ -92,41 +118,50 @@ function renderSize() {
 function renderCategory(cat) {
   const items = catalog.products.filter(p => p.category === cat.id);
   const limit = limitFor(cat);
+  const min = minFor(cat);
   const count = selectedIn(cat.id).length;
-  const full = count >= limit;
+  const full = !canAdd(cat);
+  const over = limit !== Infinity && count >= limit && !full;
   return `<h2>${state.step + 1}. ${esc(tr(cat))}</h2>
     <p class="muted">${esc(tr(cat, 'description'))}</p>
     <div class="counter">${limit === Infinity
       ? t('selected', { n: count }) + (cat.limited ? '' : t('optionalPriced'))
-      : t('ofSelected', { n: count, max: limit }) + (full ? t('limitReached') : '')}</div>
+      : t('ofSelected', { n: count, max: limit }) + (min ? t('minNote', { min }) : '') + (full ? t('limitReached') : over ? t('extraCharged') : '')}</div>
     <div class="grid">
       ${items.length ? items.map(p => {
         const sel = state.selected.has(p.id);
-        const price = itemPrice(p);
+        const price = sel ? itemPrice(p) : nextPrice(p);
         return `<div class="option ${sel ? 'selected' : ''} ${!sel && full ? 'disabled' : ''}" data-item="${esc(p.id)}">
           <span class="check">✓</span>
           <div style="font-weight:600;padding-right:26px">${esc(tr(p))}</div>
+          ${tr(p, 'description') ? `<div class="muted" style="font-size:.85rem">${esc(tr(p, 'description'))}</div>` : ''}
           <div class="${price ? 'price' : 'muted'}">${price ? '+' + money(price) : t('included')}</div>
         </div>`;
       }).join('') : `<p class="muted">${t('noItems')}</p>`}
     </div>
-    ${navButtons(count === 0 ? t('skip') : t('next'))}`;
+    ${navButtons(count === 0 && !min ? t('skip') : t('next'), count < min)}`;
 }
 
 function renderDetails() {
   const c = state.customer;
-  const today = new Date().toISOString().slice(0, 10);
+  const st = catalog.settings;
+  const minDate = isoDay(st.minLeadDays || 0);
+  const fee = deliveryFor(totals().subtotal);
+  const days = t('weekdays');
   const f = (id, label, type = 'text', extra = '') =>
     `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(c[id])}" ${extra}></div>`;
   return `<h2>${state.step + 1}. ${t('stepDetails')}</h2>
     <div class="seg">
-      <div class="option ${state.fulfillment === 'delivery' ? 'selected' : ''}" data-ful="delivery">🚚 ${t('delivery')} (+${money(catalog.settings.deliveryFee)})</div>
-      <div class="option ${state.fulfillment === 'pickup' ? 'selected' : ''}" data-ful="pickup">🏠 ${t('pickup')}</div>
+      ${st.deliveryEnabled ? `<div class="option ${state.fulfillment === 'delivery' ? 'selected' : ''}" data-ful="delivery">🚚 ${t('delivery')} (${fee || state.fulfillment !== 'delivery' ? '+' + money(st.deliveryFee) : t('free')})</div>` : ''}
+      ${st.pickupEnabled ? `<div class="option ${state.fulfillment === 'pickup' ? 'selected' : ''}" data-ful="pickup">🏠 ${t('pickup')}</div>` : ''}
     </div>
+    ${st.deliveryEnabled && st.freeDeliveryFrom ? `<p class="muted">${t('freeFrom', { amount: money(st.freeDeliveryFrom) })}</p>` : ''}
     <div class="row2">${f('name', t('fullName'))}${f('phone', t('phone'), 'tel')}</div>
     ${f('email', t('email'), 'email')}
     ${state.fulfillment === 'delivery' ? f('address', t('address')) : ''}
-    <div class="row2">${f('date', t('eventDate'), 'date', `min="${today}"`)}${f('time', t('time'), 'time')}</div>
+    <div class="row2">${f('date', t('eventDate'), 'date', `min="${minDate}"`)}${f('time', t('time'), 'time')}</div>
+    ${st.minLeadDays || st.closedWeekdays.length ? `<p class="muted">${[st.minLeadDays ? t('leadNote', { n: st.minLeadDays }) : '',
+      st.closedWeekdays.length ? t('closedNote', { days: st.closedWeekdays.map(d => days[d]).join(', ') }) : ''].filter(Boolean).join(' · ')}</p>` : ''}
     ${f('occasion', t('occasion'))}
     <div class="field"><label for="notes">${t('notes')}</label><textarea id="notes">${esc(c.notes)}</textarea></div>
     <div id="formErr"></div>
@@ -190,10 +225,9 @@ function bind(cur) {
     const newId = el.dataset.size;
     if (newId !== state.sizeId) {
       state.sizeId = newId;
-      // trim selections that exceed the new size's limits
-      catalog.categories.forEach(cat => {
-        const lim = limitFor(cat);
-        selectedIn(cat.id).slice(lim).forEach(p => state.selected.delete(p.id));
+      // trim selections that exceed the new size's limits (unless extras are allowed)
+      if (!size().allowExtras) catalog.categories.forEach(cat => {
+        selectedIn(cat.id).slice(limitFor(cat)).forEach(p => state.selected.delete(p.id));
       });
     }
     render();
@@ -203,7 +237,7 @@ function bind(cur) {
     if (state.selected.has(id)) state.selected.delete(id);
     else {
       const cat = catalog.categories.find(c => c.id === product(id).category);
-      if (selectedIn(cat.id).length >= limitFor(cat)) return;
+      if (!canAdd(cat)) return;
       state.selected.add(id);
     }
     render();
@@ -222,6 +256,9 @@ function bind(cur) {
     }
     if (cur.key === 'cat' && isLastCategory(cur.cat) && state.selected.size === 0) {
       alert(t('errEmpty')); return;
+    }
+    if (cur.key === 'cat' && isLastCategory(cur.cat) && catalog.settings.minOrderTotal && totals().subtotal < catalog.settings.minOrderTotal) {
+      alert(t('errMinOrder', { min: money(catalog.settings.minOrderTotal) })); return;
     }
     if (cur.key === 'summary') return submit(next);
     state.step++;
@@ -242,6 +279,9 @@ function validate() {
   if (!/^[+\d\s()-]{7,}$/.test(c.phone.trim())) return t('errPhone');
   if (state.fulfillment === 'delivery' && !c.address.trim()) return t('errAddress');
   if (!c.date) return t('errDate');
+  const st = catalog.settings;
+  if (c.date < isoDay(st.minLeadDays || 0)) return t('errLead', { n: st.minLeadDays });
+  if (st.closedWeekdays.includes(new Date(c.date + 'T12:00:00').getDay())) return t('errClosed');
   return null;
 }
 
@@ -278,6 +318,10 @@ async function submit(btn) {
   // Static hosting (GitHub Pages) has no API; fall back to the prebuilt catalog.json
   const apiRes = await fetch('/api/catalog').catch(() => null);
   catalog = apiRes && apiRes.ok ? await apiRes.json() : await (await fetch('catalog.json')).json();
+  catalog.settings.closedWeekdays ||= [];
+  catalog.settings.deliveryEnabled ??= true;
+  catalog.settings.pickupEnabled ??= true;
+  if (!catalog.settings.deliveryEnabled) state.fulfillment = 'pickup';
   document.getElementById('bizName').textContent = catalog.settings.businessName;
   const box = document.getElementById('langBox');
   box.innerHTML = langSwitcher();

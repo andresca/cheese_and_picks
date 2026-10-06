@@ -41,6 +41,10 @@ async function saveOrder(o, ignoreExisting = false) {
      ON CONFLICT (id) DO ${ignoreExisting ? 'NOTHING' : 'UPDATE SET status = EXCLUDED.status, data = EXCLUDED.data'}`,
     [o.id, o.createdAt, o.status, o]);
 }
+async function countOrdersOn(date) {
+  const { rows } = await pool.query("SELECT count(*)::int AS n FROM orders WHERE status <> 'cancelled' AND data->'customer'->>'date' = $1", [date]);
+  return rows[0].n;
+}
 async function deleteOrder(id) {
   const { rowCount } = await pool.query('DELETE FROM orders WHERE id = $1', [id]);
   return rowCount > 0;
@@ -57,4 +61,4 @@ async function deleteSession(tokenHash) {
   await pool.query('DELETE FROM admin_sessions WHERE token_hash = $1', [tokenHash]);
 }
 
-module.exports = { pool, init, getCatalog, saveCatalog, getOrders, getOrder, saveOrder, deleteOrder, createSession, isValidSession, deleteSession };
+module.exports = { pool, init, getCatalog, saveCatalog, getOrders, getOrder, saveOrder, deleteOrder, countOrdersOn, createSession, isValidSession, deleteSession };

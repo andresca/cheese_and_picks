@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
+const { publicCatalog } = require('./public-catalog');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -30,6 +31,11 @@ const MSG = {
     tooMany: 'Demasiados productos de {cat} para la tabla {size} (máx. {max})',
     required: 'Nombre, teléfono y fecha son obligatorios', address: 'La dirección es obligatoria para domicilio',
     empty: 'Por favor selecciona al menos un producto',
+    tooFew: 'Elige al menos {min} de {cat} para la tabla {size}',
+    noDelivery: 'El domicilio no está disponible', noPickup: 'Recoger en tienda no está disponible',
+    badDate: 'Fecha inválida', leadTime: 'Necesitamos al menos {n} día(s) de anticipación',
+    closedDay: 'No recibimos pedidos para ese día de la semana', fullDay: 'Ya no tenemos cupo para esa fecha, elige otra',
+    minOrder: 'El pedido mínimo es {min}',
     newOrder: 'Nuevo pedido', table: 'Tabla', subtotal: 'Subtotal', delivery: 'Domicilio', total: 'TOTAL',
     customer: 'Cliente', phone: 'Teléfono', email: 'Correo', pickup: 'Recoger', address2: 'Dirección',
     occasion: 'Ocasión', notes: 'Notas',
@@ -39,6 +45,11 @@ const MSG = {
     tooMany: 'Too many {cat} items for the {size} table (max {max})',
     required: 'Name, phone and date are required', address: 'Address is required for delivery',
     empty: 'Please select at least one item',
+    tooFew: 'Choose at least {min} {cat} for the {size} table',
+    noDelivery: 'Delivery is not available', noPickup: 'Pickup is not available',
+    badDate: 'Invalid date', leadTime: 'We need at least {n} day(s) notice',
+    closedDay: 'We do not take orders for that weekday', fullDay: 'That date is fully booked, please choose another',
+    minOrder: 'The minimum order is {min}',
     newOrder: 'New order', table: 'Table', subtotal: 'Subtotal', delivery: 'Delivery', total: 'TOTAL',
     customer: 'Customer', phone: 'Phone', email: 'Email', pickup: 'Pickup', address2: 'Address',
     occasion: 'Occasion', notes: 'Notes',
@@ -47,6 +58,19 @@ const MSG = {
 const msg = (lang, key, vars = {}) => (MSG[lang] || MSG.es)[key].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
 const loc = (lang, obj, field = 'name') => (lang === 'en' && obj?.[field + 'En']) || obj?.[field] || '';
 class UserError extends Error {}
+
+// "6-8 personas" / "6-8 people" built from numbers (same rule as servesLabel in public/i18n.js).
+function servesLabel(min, max, lang) {
+  const [a, b] = [min || max, max || min];
+  if (!a) return lang === 'en' ? 'You decide' : 'Tú decides';
+  const n = a === b ? String(a) : a + '-' + b;
+  const one = a === 1 && b === 1;
+  return n + ' ' + (lang === 'en' ? (one ? 'person' : 'people') : (one ? 'persona' : 'personas'));
+}
+const parseServes = text => {
+  const [min = 0, max = min] = (String(text || '').match(/\d+/g) || []).map(Number);
+  return { servesMin: min, servesMax: max };
+};
 
 const CURRENCY_DIGITS = { COP: 0, CLP: 0, JPY: 0 };
 function formatMoney(n, code = 'COP') {
@@ -59,6 +83,7 @@ function formatMoney(n, code = 'COP') {
 }
 
 // ---------- pricing (always computed server-side) ----------
+const line = p => ({ id: p.id, name: p.name, nameEn: p.nameEn, category: p.category });
 function priceOrder(catalog, sizeId, itemIds, lang) {
   const size = catalog.sizes.find(s => s.id === sizeId && s.active);
   if (!size) throw new UserError(msg(lang, 'badSize'));
@@ -70,26 +95,24 @@ function priceOrder(catalog, sizeId, itemIds, lang) {
     return p;
   });
 
-  const limitedCats = catalog.categories.filter(c => c.limited).map(c => c.id);
-  const counts = {};
-  items.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
-
-  if (!size.custom) {
-    for (const cat of limitedCats) {
-      const max = size.limits[cat] ?? 0;
-      if ((counts[cat] || 0) > max) {
-        const catObj = catalog.categories.find(c => c.id === cat);
-        throw new UserError(msg(lang, 'tooMany', { cat: loc(lang, catObj).toLowerCase(), size: loc(lang, size), max }));
-      }
+  const lines = [];
+  for (const cat of catalog.categories) {
+    const inCat = items.filter(p => p.category === cat.id);
+    if (size.custom || !cat.limited) {
+      inCat.forEach(p => lines.push({ ...line(p), price: p.price, included: false }));
+      continue;
     }
+    const max = size.limits?.[cat.id] ?? 0;
+    const min = Math.min(size.mins?.[cat.id] ?? 0, max);
+    const vars = { min, max, cat: loc(lang, cat).toLowerCase(), size: loc(lang, size) };
+    if (inCat.length < min) throw new UserError(msg(lang, 'tooFew', vars));
+    if (inCat.length > max && !size.allowExtras) throw new UserError(msg(lang, 'tooMany', vars));
+    // The most expensive picks fill the included slots (paying only their surcharge); extras pay full price.
+    [...inCat].sort((x, y) => y.price - x.price).forEach((p, i) => {
+      const included = i < max;
+      lines.push({ ...line(p), price: included ? (p.surcharge || 0) : p.price, included });
+    });
   }
-
-  // Included items on base sizes cost nothing extra; custom tables pay per item.
-  // Unlimited categories (wines/extras) are always charged.
-  const lines = items.map(p => {
-    const included = !size.custom && limitedCats.includes(p.category);
-    return { id: p.id, name: p.name, nameEn: p.nameEn, category: p.category, price: included ? 0 : p.price, included };
-  });
   const subtotal = size.basePrice + lines.reduce((s, l) => s + l.price, 0);
   return {
     size: { id: size.id, name: size.name, nameEn: size.nameEn, serves: size.serves, servesEn: size.servesEn, basePrice: size.basePrice },
@@ -143,6 +166,18 @@ function buildWhatsappText(order, catalog) {
   return t;
 }
 
+// Date rules: minimum notice, closed weekdays, daily capacity.
+async function checkDate(settings, date, lang) {
+  const day = new Date(date + 'T12:00:00');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(day)) throw new UserError(msg(lang, 'badDate'));
+  const lead = parseInt(settings.minLeadDays) || 0;
+  const earliest = new Date(Date.now() + lead * 86_400_000).toISOString().slice(0, 10);
+  if (date < earliest) throw new UserError(msg(lang, 'leadTime', { n: lead }));
+  if ((settings.closedWeekdays || []).includes(day.getDay())) throw new UserError(msg(lang, 'closedDay'));
+  const cap = parseInt(settings.maxOrdersPerDay) || 0;
+  if (cap && (await db.countOrdersOn(date)) >= cap) throw new UserError(msg(lang, 'fullDay'));
+}
+
 // ---------- app ----------
 const app = express();
 app.set('trust proxy', 1); // correct client IPs for rate limiting behind a host's proxy
@@ -188,13 +223,7 @@ app.use('/api', apiLimiter);
 
 // Public catalog (only active entries)
 app.get('/api/catalog', wrap(async (req, res) => {
-  const cat = await getCatalog();
-  res.json({
-    settings: { businessName: cat.settings.businessName, currencyCode: cat.settings.currencyCode || 'COP', deliveryFee: cat.settings.deliveryFee },
-    categories: cat.categories,
-    sizes: cat.sizes.filter(s => s.active),
-    products: cat.products.filter(p => p.active),
-  });
+  res.json(publicCatalog(await getCatalog()));
 }));
 
 app.post('/api/orders', orderLimiter, async (req, res) => {
@@ -208,19 +237,26 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       address: str(customer.address), date: str(customer.date), time: str(customer.time),
       occasion: str(customer.occasion), notes: str(customer.notes),
     };
+    const st = catalog.settings;
     const mode = fulfillment === 'pickup' ? 'pickup' : 'delivery';
     if (!cu.name || !cu.phone || !cu.date) throw new UserError(msg(lang, 'required'));
+    if (mode === 'delivery' && st.deliveryEnabled === false) throw new UserError(msg(lang, 'noDelivery'));
+    if (mode === 'pickup' && st.pickupEnabled === false) throw new UserError(msg(lang, 'noPickup'));
     if (mode === 'delivery' && !cu.address) throw new UserError(msg(lang, 'address'));
+    await checkDate(st, cu.date, lang);
 
     const priced = priceOrder(catalog, sizeId, itemIds, lang);
     if (priced.lines.length === 0) throw new UserError(msg(lang, 'empty'));
-    const deliveryFee = mode === 'delivery' ? Number(catalog.settings.deliveryFee) || 0 : 0;
+    const currency = st.currencyCode || 'COP';
+    if (st.minOrderTotal && priced.subtotal < st.minOrderTotal) throw new UserError(msg(lang, 'minOrder', { min: formatMoney(st.minOrderTotal, currency) }));
+    const freeFrom = Number(st.freeDeliveryFrom) || 0;
+    const deliveryFee = mode === 'delivery' && !(freeFrom && priced.subtotal >= freeFrom) ? Number(st.deliveryFee) || 0 : 0;
     const order = {
       id: newOrderId(),
       createdAt: new Date().toISOString(),
       status: 'new',
       lang,
-      currencyCode: catalog.settings.currencyCode || 'COP',
+      currencyCode: currency,
       fulfillment: mode,
       ...priced,
       deliveryFee,
@@ -332,12 +368,31 @@ app.put('/api/admin/catalog', requireAdmin, wrap(async (req, res) => {
   if (!c || !c.settings || !Array.isArray(c.sizes) || !Array.isArray(c.products) || !Array.isArray(c.categories)) {
     return res.status(400).json({ error: 'Invalid catalog' });
   }
-  c.products.forEach(p => { p.price = Number(p.price) || 0; if (!p.id) p.id = 'p' + crypto.randomBytes(4).toString('hex'); });
-  c.sizes.forEach(s => {
-    s.basePrice = Number(s.basePrice) || 0;
-    for (const k of Object.keys(s.limits || {})) s.limits[k] = Math.max(0, parseInt(s.limits[k]) || 0);
+  const num = v => Math.max(0, Number(v) || 0);
+  const int = v => Math.max(0, parseInt(v) || 0);
+  c.products.forEach(p => {
+    p.price = num(p.price); p.surcharge = num(p.surcharge);
+    if (!p.id) p.id = 'p' + crypto.randomBytes(4).toString('hex');
   });
-  c.settings.deliveryFee = Number(c.settings.deliveryFee) || 0;
+  c.sizes.forEach(s => {
+    s.basePrice = num(s.basePrice);
+    s.limits ||= {}; s.mins ||= {};
+    for (const k of Object.keys(s.limits)) s.limits[k] = int(s.limits[k]);
+    for (const k of Object.keys(s.mins)) s.mins[k] = Math.min(int(s.mins[k]), s.limits[k] ?? 0);
+    s.allowExtras = !!s.allowExtras;
+    if (s.servesMin === undefined) Object.assign(s, parseServes(s.serves)); // older catalogs stored free text
+    s.servesMin = int(s.servesMin); s.servesMax = int(s.servesMax);
+    if (s.servesMax && s.servesMax < s.servesMin) [s.servesMin, s.servesMax] = [s.servesMax, s.servesMin];
+    s.serves = servesLabel(s.servesMin, s.servesMax, 'es');
+    s.servesEn = servesLabel(s.servesMin, s.servesMax, 'en');
+  });
+  const st = c.settings;
+  for (const k of ['deliveryFee', 'freeDeliveryFrom', 'minOrderTotal']) st[k] = num(st[k]);
+  for (const k of ['minLeadDays', 'maxOrdersPerDay']) st[k] = int(st[k]);
+  st.closedWeekdays = [...new Set((st.closedWeekdays || []).map(Number).filter(d => d >= 0 && d <= 6))];
+  st.deliveryEnabled = st.deliveryEnabled !== false;
+  st.pickupEnabled = st.pickupEnabled !== false;
+  if (!st.deliveryEnabled && !st.pickupEnabled) return res.status(400).json({ error: 'Enable delivery or pickup' });
   await db.saveCatalog(c);
   res.json(c);
 }));
