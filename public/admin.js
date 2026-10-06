@@ -3,7 +3,6 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const STATUSES = ['new', 'confirmed', 'preparing', 'delivered', 'cancelled'];
 const CURRENCIES = ['COP', 'USD', 'EUR', 'MXN'];
 const app = document.getElementById('app');
-let token = sessionStorage.getItem('adminToken');
 let tab = 'dashboard';
 let catalog = null;
 let orders = [];
@@ -12,51 +11,47 @@ const filters = { status: '', q: '', from: '', to: '' };
 const money = (n, code) => formatMoney(n, code || catalog?.settings.currencyCode || 'COP');
 const st = s => t('status_' + s);
 
+// Sign-in is handled by Cloudflare Access (email one-time code) before this page loads;
+// its cookie is sent automatically with every same-origin request.
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  if (res.status === 401) { logout(); throw new Error('Session expired'); }
-  const data = await res.json();
+  let res, data;
+  try {
+    res = await fetch(path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json' },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    data = await res.json();
+  } catch {
+    // Expired Access session: Cloudflare answers with a redirect to its login page instead of JSON.
+    renderSignedOut();
+    throw new Error(t('sessionExpired'));
+  }
+  if (res.status === 401 || res.status === 403) { renderSignedOut(data.error); throw new Error(data.error); }
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
 
-function logout() {
-  if (token) fetch('/api/admin/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
-  token = null;
-  sessionStorage.removeItem('adminToken');
-  renderLogin();
-}
-document.getElementById('logout').onclick = logout;
+// Ends the Cloudflare Access session; the next visit asks for a new email code.
+document.getElementById('logout').onclick = () => { location.href = '/cdn-cgi/access/logout'; };
 
 // language switch in header
 const langBox = document.getElementById('langBox');
 langBox.innerHTML = langSwitcher();
 langBox.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => {
   setLang(b.dataset.lang);
-  if (token && catalog) renderShell(); else if (!token) renderLogin();
+  if (catalog) renderShell();
 });
 setLang(LANG);
 
-// ---------- login ----------
-function renderLogin() {
+// ---------- signed out / session expired ----------
+function renderSignedOut(detail) {
   document.getElementById('logout').style.display = 'none';
   app.innerHTML = `<div class="card login">
     <h2>${t('login')}</h2>
-    <form id="lf"><div class="field"><label>${t('password')}</label><input type="password" id="pw" autofocus></div>
-    <div id="err"></div><button class="btn" style="width:100%">${t('enter')}</button></form></div>`;
-  document.getElementById('lf').onsubmit = async e => {
-    e.preventDefault();
-    const res = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw.value }) });
-    const d = await res.json();
-    if (!res.ok) { document.getElementById('err').innerHTML = `<div class="error">${esc(d.error)}</div>`; return; }
-    token = d.token;
-    sessionStorage.setItem('adminToken', token);
-    start();
-  };
+    <p class="muted">${t('sessionExpired')}</p>${detail ? `<div class="error">${esc(detail)}</div>` : ''}
+    <button class="btn" style="width:100%" id="relogin">${t('enter')}</button></div>`;
+  document.getElementById('relogin').onclick = () => location.reload();
 }
 
 async function start() {
@@ -627,4 +622,4 @@ function renderSettings() {
   };
 }
 
-token ? start() : renderLogin();
+start();

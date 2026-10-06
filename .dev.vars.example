@@ -1,0 +1,2 @@
+DATABASE_URL=postgresql://user:password@host/db?sslmode=verify-full&channel_binding=require
+DEV_SKIP_ACCESS=true

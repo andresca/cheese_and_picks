@@ -2,20 +2,28 @@
 
 Cheese-table ordering site with a step-by-step builder, WhatsApp order delivery and an admin console.
 
-## Run
+## Stack
+- **Storefront + admin page**: static files in `public/`, published to GitHub Pages.
+- **API**: Cloudflare Worker (`src/`) on `cheese-picks.websportal.dev/api/*`.
+- **Database**: Neon Postgres; schema changes in `migrations/`.
+- **Admin sign-in**: Cloudflare Access (Zero Trust) email one-time code.
+
+Production setup, step by step: [docs/SETUP.md](docs/SETUP.md).
+
+## Run locally
 ```
 npm install
-cp .env.example .env   # then fill in DATABASE_URL and ADMIN_PASSWORD
-npm start              # http://localhost:3000   (admin: http://localhost:3000/admin)
+cp .dev.vars.example .dev.vars   # fill in DATABASE_URL
+cp .env.example .env             # same DATABASE_URL, used by npm run migrate
+npm run migrate                  # create/update tables, seed the catalog the first time
+npm run dev                      # http://localhost:8787   (admin: http://localhost:8787/admin)
 ```
-The server won't start without `DATABASE_URL` (Postgres, e.g. Neon) and an `ADMIN_PASSWORD` of at least 12 characters.
-Tables are created on first start and the catalog is seeded from `data/catalog.json`.
+Locally, `DEV_SKIP_ACCESS=true` skips the email sign-in. It only works on localhost.
 
 ## Security
-- Admin sessions: random token, only its hash is stored in the database, expires after 12 hours; logout revokes it.
-- Rate limits: 5 failed logins per 15 min, 10 orders per 15 min, 120 API requests per minute (per IP).
-- Security headers (CSP, HSTS, no framing) via helmet; request bodies capped at 200 KB; prices always computed server-side.
-- Cross-origin API access only for origins listed in `ALLOWED_ORIGINS`.
+- Admin: only people whose email is in the Cloudflare Access policy can sign in, with a one-time code sent to that email. The Worker verifies Access's signed token on every admin API call and stays locked if Access isn't configured.
+- Orders are rate-limited per IP (5 per minute); request bodies are capped at 200 KB; prices are always computed server-side.
+- Secrets (`DATABASE_URL`) live only in Worker secrets, GitHub Actions secrets and git-ignored local files.
 
 ## How it works
 - **Sizes** (Small / Medium / Large) have a base price that includes up to N cheeses, proteins and accompaniments.
@@ -24,5 +32,5 @@ Tables are created on first start and the catalog is seeded from `data/catalog.j
 - On confirm, the order is saved and WhatsApp opens with the full summary pre-filled to your number.
 
 ## Data
-- Postgres tables: `catalog` (one JSON document, edited from the admin console), `orders`, `admin_sessions`.
-- `data/catalog.json` is only the initial seed, and the static catalog for the GitHub Pages build.
+- Postgres tables: `catalog` (one JSON document, edited from the admin console) and `orders`.
+- `data/catalog.json` is only the initial seed, and a fallback catalog in the GitHub Pages build if the API can't be reached.

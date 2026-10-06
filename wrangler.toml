@@ -1,0 +1,37 @@
+name = "cheese-picks-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Only the API runs on the Worker; every other path on the domain is served by GitHub Pages.
+workers_dev = false
+routes = [
+  { pattern = "cheese-picks.websportal.dev/api/*", zone_name = "websportal.dev" },
+]
+
+# Local dev sees requests as localhost (not the production host), which is the only place
+# DEV_SKIP_ACCESS from .dev.vars is honored.
+[dev]
+host = "localhost"
+
+# Local dev (`npm run dev`) serves the storefront from public/ through the same Worker.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/admin"]
+
+# Per-IP rate limits (Cloudflare rate limiting binding; period must be 10 or 60 seconds).
+[[ratelimits]]
+name = "ORDER_LIMITER"
+namespace_id = "7262002"
+simple = { limit = 5, period = 60 }
+
+[vars]
+# From Zero Trust → Settings → Custom pages: "<team>.cloudflareaccess.com"
+ACCESS_TEAM_DOMAIN = ""
+# From Zero Trust → Access → Applications → Cheese Picks Admin → Overview → "Application Audience (AUD) Tag"
+ACCESS_AUD = ""
+
+# Secrets (never in this file):
+#   npx wrangler secret put DATABASE_URL
+# For local dev put them in .dev.vars (git-ignored); see .dev.vars.example.

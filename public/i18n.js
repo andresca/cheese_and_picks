@@ -34,7 +34,7 @@ const I18N = {
     sendWa: 'Enviar pedido por WhatsApp', newOrder: 'Hacer un nuevo pedido',
     // admin
     adminSub: 'Pedidos, estadísticas y catálogo', viewStore: 'Ver tienda ↗', logout: 'Cerrar sesión',
-    login: 'Ingreso administrador', password: 'Contraseña', enter: 'Ingresar',
+    login: 'Ingreso administrador', sessionExpired: 'Tu sesión terminó. Ingresa de nuevo con el código que llega a tu correo.', enter: 'Ingresar',
     tabDashboard: '📊 Panel', tabOrders: '🧾 Pedidos', tabCatalog: '🧀 Catálogo', tabSettings: '⚙️ Ajustes',
     loading: 'Cargando…', noData: 'Aún no hay datos.',
     kTotal: 'Pedidos totales', kRevenue: 'Ventas (sin cancelados)', kAvg: 'Pedido promedio', kOpen: 'Pedidos por atender',
@@ -121,7 +121,7 @@ const I18N = {
     waFallback: "If WhatsApp didn't open automatically, tap the button below to send us your order.",
     sendWa: 'Send order via WhatsApp', newOrder: 'Start a new order',
     adminSub: 'Orders, statistics and catalog', viewStore: 'View store ↗', logout: 'Log out',
-    login: 'Admin login', password: 'Password', enter: 'Log in',
+    login: 'Admin login', sessionExpired: 'Your session ended. Sign in again with the code sent to your email.', enter: 'Log in',
     tabDashboard: '📊 Dashboard', tabOrders: '🧾 Orders', tabCatalog: '🧀 Catalog', tabSettings: '⚙️ Settings',
     loading: 'Loading…', noData: 'No data yet.',
     kTotal: 'Total orders', kRevenue: 'Revenue (excl. cancelled)', kAvg: 'Average order', kOpen: 'Open orders to fulfil',
