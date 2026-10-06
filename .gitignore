@@ -4,3 +4,4 @@ data/orders.json
 _site/
 .dev.vars
 .wrangler/
+/.history/
