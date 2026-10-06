@@ -2,28 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+const { migrate } = require('./migrate');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 
 async function init() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS catalog (
-      id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-      data JSONB NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS orders (
-      id TEXT PRIMARY KEY,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      status TEXT NOT NULL,
-      data JSONB NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders (created_at DESC);
-    CREATE TABLE IF NOT EXISTS admin_sessions (
-      token_hash TEXT PRIMARY KEY,
-      expires_at TIMESTAMPTZ NOT NULL
-    );
-  `);
+  await migrate(pool);
   // Seed the catalog from the bundled JSON the first time.
   const seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'catalog.json'), 'utf8'));
   await pool.query('INSERT INTO catalog (id, data) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', [seed]);
