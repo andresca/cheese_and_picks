@@ -87,13 +87,56 @@
       .cat-row .stack, .prod-row .stack { grid-column: 1 / -1; }
       .drow.head { display: none; }
     }
+    /* grid/flex children may shrink below their content, so wide tables scroll instead of widening the page */
+    .two > *, .sc-body > *, .drow > * { min-width: 0; }
+    .tog > span { white-space: normal; }
+    .cell { display: block; margin: 0; font-weight: 400; }
+    .mlbl { display: none; }
+    header.site .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    @media (max-width: 800px) {
+      .mlbl { display: block; font-size: .75rem; color: var(--muted); font-weight: 600; }
+      .tog .mlbl { display: inline; }
+    }
+    @media (max-width: 600px) {
+      header.site { padding: 14px 0; }
+      header.site .container { flex-direction: column; align-items: stretch; gap: 10px; }
+      header.site h1 { font-size: 1.3rem; }
+      header.site .actions { justify-content: space-between; }
+      /* tabs: one swipeable row instead of wrapping onto two */
+      .tabs { flex-wrap: nowrap; overflow-x: auto; margin: 14px -16px; padding: 0 16px 4px; scrollbar-width: none; }
+      .tabs button { flex: none; padding: 8px 14px; }
+      .subtabs button { flex: 1; padding: 10px 8px; font-size: .9rem; }
+      .card { padding: 14px; }
+      .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .kpi .v { font-size: 1.35rem; overflow-wrap: anywhere; }
+      .two { gap: 12px; margin-bottom: 12px; }
+      .bar { grid-template-columns: 92px 1fr 64px; font-size: .82rem; }
+      .filters input, .filters select { min-width: 0; flex: 1 1 100%; }
+      .filters input[type=date] { flex: 1 1 40%; }
+      .filters .btn { flex: 1 1 100%; }
+      .section-h #pq { max-width: none !important; }
+      .group { padding: 8px; }
+      .group-h .btn { margin-left: 0 !important; width: 100%; }
+      table.inc input { width: 60px !important; }
+      /* "what's included": category + two inputs on one line, the hint underneath */
+      table.inc, table.inc tbody { display: block; }
+      table.inc tr { display: grid; grid-template-columns: 1fr 68px 68px; align-items: center; border-bottom: 1px solid var(--line); }
+      table.inc th, table.inc td { border: 0; }
+      table.inc th:nth-child(4) { display: none; }
+      table.inc td:nth-child(4) { grid-column: 1 / -1; padding-top: 0; }
+      .modal-bg { padding: 0; place-items: end stretch; }
+      .modal { max-height: 92vh; border-radius: var(--radius) var(--radius) 0 0; }
+      .savebar { left: 12px; right: 12px; bottom: 12px; transform: translateY(150%); justify-content: space-between; border-radius: 16px; }
+      .savebar.show { transform: translateY(0); }
+      .login { margin: 40px auto; }
+    }
   </style>
 </head>
 <body>
   <header class="site">
     <div class="container">
       <div><h1>Cheese Picks · Admin</h1><small data-i18n="adminSub"></small></div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="langBox"></span><a href="/" target="_blank" style="color:#f5ead8" data-i18n="viewStore"></a> <button class="btn small ghost" id="logout" style="color:#f5ead8;border-color:#f5ead8;display:none" data-i18n="logout"></button></div>
+      <div class="actions"><span id="langBox"></span><a href="/" target="_blank" style="color:#f5ead8" data-i18n="viewStore"></a> <button class="btn small ghost" id="logout" style="color:#f5ead8;border-color:#f5ead8;display:none" data-i18n="logout"></button></div>
     </div>
   </header>
   <main class="container" id="app"></main>

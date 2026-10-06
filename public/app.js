@@ -73,6 +73,9 @@ function render() {
   const st = steps();
   document.getElementById('stepper').innerHTML = st.map((s, i) =>
     `<div class="s ${i < state.step ? 'done' : ''} ${i === state.step ? 'active' : ''}">${i + 1}. ${esc(s.label)}</div>`).join('');
+  // On narrow screens the stepper scrolls sideways; keep the current step in view.
+  const stepper = document.getElementById('stepper'), activeStep = stepper.querySelector('.active');
+  if (activeStep) stepper.scrollLeft = activeStep.offsetLeft - stepper.offsetLeft - 16;
   const cur = st[state.step];
   const body = document.getElementById('stepBody');
   if (cur.key === 'size') body.innerHTML = renderSize();
@@ -202,9 +205,13 @@ function renderSummary() {
 function renderCart() {
   const s = size();
   const el = document.getElementById('cart');
-  if (!s) { el.innerHTML = `<h3>${t('yourTable')}</h3><p class="muted">${t('chooseToStart')}</p>`; return; }
+  const bar = document.getElementById('mtotal');
+  if (!s) { el.innerHTML = `<h3>${t('yourTable')}</h3><p class="muted">${t('chooseToStart')}</p>`; bar.hidden = true; return; }
   const tt = totals();
   const atEnd = state.step >= steps().length - 2;
+  // Phone-only bar: the cart sits below the step, so keep the running total visible.
+  bar.hidden = false;
+  bar.innerHTML = `<span>${t('yourTable')} · ${esc(tr(s))}</span><b>${money(atEnd ? tt.total : tt.subtotal)}</b>`;
   el.innerHTML = `<h3>${t('yourTable')}</h3>
     <div class="line"><span>${esc(tr(s))}</span><span>${money(s.basePrice)}</span></div>
     ${catalog.categories.map(cat => {
@@ -299,6 +306,7 @@ async function submit(btn) {
     window.open(data.whatsappUrl, '_blank');
     done = true;
     document.getElementById('cart').style.display = 'none';
+    document.getElementById('mtotal').hidden = true;
     document.getElementById('stepBody').innerHTML = `<div class="success">
       <div class="big">🧀🍷</div>
       <h2>${esc(t('thanks', { name: state.customer.name }))}</h2>

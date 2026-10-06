@@ -397,9 +397,9 @@ function renderProducts() {
               ${handle}
               <div class="stack">${pair('data-p', i, 'name', p, t('nameLbl'))}</div>
               <div class="stack grow">${pair('data-p', i, 'description', p, t('descLbl'))}</div>
-              <input data-p="${i}" data-k="price" type="number" min="0" step="${step}" value="${p.price}" class="num" title="${esc(t('price'))}">
-              <input data-p="${i}" data-k="surcharge" type="number" min="0" step="${step}" value="${p.surcharge || 0}" class="num" title="${esc(t('surcharge'))}">
-              <label class="tog"><input type="checkbox" data-p="${i}" data-k="active" ${p.active ? 'checked' : ''}></label>
+              <label class="cell"><span class="mlbl">${t('price')}</span><input data-p="${i}" data-k="price" type="number" min="0" step="${step}" value="${p.price}" class="num" title="${esc(t('price'))}"></label>
+              <label class="cell"><span class="mlbl">${t('surcharge')}</span><input data-p="${i}" data-k="surcharge" type="number" min="0" step="${step}" value="${p.surcharge || 0}" class="num" title="${esc(t('surcharge'))}"></label>
+              <label class="tog"><input type="checkbox" data-p="${i}" data-k="active" ${p.active ? 'checked' : ''}> <span class="mlbl">${t('active')}</span></label>
               <span>${touchArrows('p', i)}<button class="btn small ghost" data-delp="${i}" title="${esc(t('del'))}">🗑</button></span>
             </div>`).join('')}
             ${items.length ? '' : `<div class="empty-drop">${q ? t('noMatch') : t('emptyGroup')}</div>`}
@@ -542,7 +542,7 @@ function renderSizes() {
 
           ${s.custom ? '' : `<h4>3. ${t('secIncluded')}</h4>
           <p class="muted" style="margin-top:0">${t('includedHelp')}</p>
-          ${limited.length ? `<table class="t inc">
+          ${limited.length ? `<div class="tablewrap"><table class="t inc">
             <tr><th>${t('category')}</th><th>${t('minPick')}</th><th>${t('maxPick')}</th><th></th></tr>
             ${limited.map(c => {
               const max = s.limits?.[c.id] ?? 0, min = s.mins?.[c.id] ?? 0;
@@ -552,7 +552,7 @@ function renderSizes() {
                 <td><input data-s="${i}" data-lim="${c.id}" type="number" min="0" value="${max}" style="width:70px"></td>
                 <td class="muted" style="font-size:.85rem">${note}</td></tr>`;
             }).join('')}
-          </table>` : `<p class="warn">${t('noLimitedCats')}</p>`}
+          </table></div>` : `<p class="warn">${t('noLimitedCats')}</p>`}
           <label class="tog" style="margin-top:12px;align-items:flex-start"><input type="checkbox" data-s="${i}" data-k="allowExtras" ${s.allowExtras ? 'checked' : ''}>
             <span><b>${t('allowExtrasLbl')}</b><br><small class="muted">${t('allowExtrasHelp')}</small></span></label>`}
         </div>
