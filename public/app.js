@@ -37,12 +37,27 @@ const canAdd = cat => size()?.allowExtras || selectedIn(cat.id).length < limitFo
 
 // Same rule as the server: the most expensive picks fill the included slots and pay only
 // their surcharge; anything beyond the limit pays full price.
-function itemPrice(p) {
-  const s = size();
+function itemPriceIn(s, p) {
   const cat = catalog.categories.find(c => c.id === p.category);
   if (!bounded(s, cat)) return p.price;
   const rank = selectedIn(cat.id).sort((x, y) => y.price - x.price).findIndex(x => x.id === p.id);
-  return rank !== -1 && rank < limitFor(cat) ? p.surcharge || 0 : p.price;
+  return rank !== -1 && rank < (s.limits[cat.id] ?? 0) ? p.surcharge || 0 : p.price;
+}
+const itemPrice = p => itemPriceIn(tier(), p);
+const subtotalIn = s => s.basePrice + [...state.selected].map(product).filter(Boolean).reduce((sum, p) => sum + itemPriceIn(s, p), 0);
+// Whether the current picks satisfy a fixed size's per-category min/max.
+const fits = s => catalog.categories.every(cat => {
+  if (!cat.limited) return true;
+  const n = selectedIn(cat.id).length, max = s.limits?.[cat.id] ?? 0;
+  return n >= Math.min(s.mins?.[cat.id] ?? 0, max) && (n <= max || s.allowExtras);
+});
+// Size used for pricing. Same rule as the server: a custom selection that fits a
+// cheaper fixed table is charged as that table.
+function tier() {
+  const s = size();
+  if (!s?.custom) return s;
+  return catalog.sizes.filter(x => x.active !== false && !x.custom && fits(x))
+    .reduce((best, x) => subtotalIn(x) < subtotalIn(best) ? x : best, s);
 }
 // Price shown on a card that isn't selected yet: what it would cost if added now.
 function nextPrice(p) {
@@ -61,7 +76,7 @@ function deliveryFor(subtotal) {
 function totals() {
   const s = size();
   if (!s) return { subtotal: 0, delivery: 0, total: 0 };
-  const subtotal = s.basePrice + [...state.selected].map(product).filter(Boolean).reduce((sum, p) => sum + itemPrice(p), 0);
+  const subtotal = subtotalIn(tier());
   const delivery = deliveryFor(subtotal);
   return { subtotal, delivery, total: subtotal + delivery };
 }
@@ -183,7 +198,7 @@ function renderSummary() {
   return `<div class="summary">
     <h2>${state.step + 1}. ${t('summaryTitle')}</h2>
     <table>
-      <tr><td><b>${tableName}</b> <span class="muted">(${esc(tr(s, 'serves'))})</span></td><td>${money(s.basePrice)}</td></tr>
+      <tr><td><b>${tableName}</b> <span class="muted">(${esc(tr(s, 'serves'))})</span>${pricedAsNote()}</td><td>${money(tier().basePrice)}</td></tr>
       ${rows}
       <tr><td style="padding-top:14px">${t('subtotal')}</td><td style="padding-top:14px">${money(tt.subtotal)}</td></tr>
       ${tt.delivery ? `<tr><td>${t('deliveryFee')}</td><td>${money(tt.delivery)}</td></tr>` : ''}
@@ -213,7 +228,8 @@ function renderCart() {
   bar.hidden = false;
   bar.innerHTML = `<span>${t('yourTable')} · ${esc(tr(s))}</span><b>${money(atEnd ? tt.total : tt.subtotal)}</b>`;
   el.innerHTML = `<h3>${t('yourTable')}</h3>
-    <div class="line"><span>${esc(tr(s))}</span><span>${money(s.basePrice)}</span></div>
+    <div class="line"><span>${esc(tr(s))}</span><span>${money(tier().basePrice)}</span></div>
+    ${pricedAsNote()}
     ${catalog.categories.map(cat => {
       const items = selectedIn(cat.id);
       if (!items.length) return '';
@@ -223,6 +239,12 @@ function renderCart() {
     }).join('')}
     ${tt.delivery && atEnd ? `<div class="line" style="margin-top:8px"><span>${t('deliveryFee')}</span><span>${money(tt.delivery)}</span></div>` : ''}
     <div class="line total"><span>${t('total')}</span><span>${money(atEnd ? tt.total : tt.subtotal)}</span></div>`;
+}
+
+// Shown when a custom selection is charged as a cheaper fixed table.
+function pricedAsNote() {
+  const tr_ = tier();
+  return tr_ !== size() ? `<p class="muted" style="font-size:.85rem;margin:4px 0">${esc(t('pricedAs', { size: tr(tr_) }))}</p>` : '';
 }
 
 // ---------- events ----------

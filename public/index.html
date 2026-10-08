@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cheese Picks — Build your cheese table</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <style>
@@ -16,7 +17,7 @@
     .stepper .s.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
     .layout { display: grid; grid-template-columns: 1fr 290px; gap: 20px; align-items: start; margin-bottom: 40px; }
-    @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+    @media (max-width: 1024px) { .layout { grid-template-columns: 1fr; } }
 
     .option {
       border: 2px solid var(--line); border-radius: var(--radius); padding: 16px; cursor: pointer;
@@ -54,7 +55,7 @@
     .success .big { font-size: 3rem; }
 
     .mtotal { display: none; }
-    @media (max-width: 820px) {
+    @media (max-width: 1024px) {
       .sticky { position: static; }
       .mtotal:not([hidden]) {
         display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -64,6 +65,18 @@
       }
       .mtotal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       main.container { padding-bottom: 72px; }
+    }
+    /* Tablet: the side cart squeezes the step content, and fixed-width step labels overflow. */
+    @media (min-width: 601px) and (max-width: 1024px) {
+      .layout { grid-template-columns: 1fr; }
+      .sticky { position: static; }
+      .stepper { gap: 8px; overflow: visible; }
+      .stepper .s {
+        flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.25;
+        display: flex; align-items: flex-start; justify-content: center; padding: 8px 2px 0;
+      }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+      .nav .btn { min-width: 140px; }
     }
     @media (max-width: 600px) {
       .hero { padding-top: 22px; }

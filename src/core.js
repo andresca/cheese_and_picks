@@ -91,6 +91,24 @@ function priceOrder(catalog, sizeId, itemIds, lang) {
     return p;
   });
 
+  let tier = size, priced = priceAs(catalog, size, items, lang, true);
+  // A custom selection that also fits a fixed table is charged as that table when it's cheaper.
+  if (size.custom) {
+    for (const s of catalog.sizes) {
+      if (!s.active || s.custom) continue;
+      const alt = priceAs(catalog, s, items, lang, false);
+      if (alt && alt.subtotal < priced.subtotal) { tier = s; priced = alt; }
+    }
+  }
+  return {
+    size: { id: size.id, name: size.name, nameEn: size.nameEn, serves: size.serves, servesEn: size.servesEn, basePrice: tier.basePrice },
+    ...(tier !== size && { pricedAs: { id: tier.id, name: tier.name, nameEn: tier.nameEn } }),
+    ...priced,
+  };
+}
+
+// Prices items under one size's rules. When the items don't fit the size, throws if `strict`, else returns null.
+function priceAs(catalog, size, items, lang, strict) {
   const lines = [];
   for (const cat of catalog.categories) {
     const inCat = items.filter(p => p.category === cat.id);
@@ -101,19 +119,18 @@ function priceOrder(catalog, sizeId, itemIds, lang) {
     const max = size.limits?.[cat.id] ?? 0;
     const min = Math.min(size.mins?.[cat.id] ?? 0, max);
     const vars = { min, max, cat: loc(lang, cat).toLowerCase(), size: loc(lang, size) };
-    if (inCat.length < min) throw new UserError(msg(lang, 'tooFew', vars));
-    if (inCat.length > max && !size.allowExtras) throw new UserError(msg(lang, 'tooMany', vars));
+    const problem = inCat.length < min ? 'tooFew' : inCat.length > max && !size.allowExtras ? 'tooMany' : null;
+    if (problem) {
+      if (strict) throw new UserError(msg(lang, problem, vars));
+      return null;
+    }
     // The most expensive picks fill the included slots (paying only their surcharge); extras pay full price.
     [...inCat].sort((x, y) => y.price - x.price).forEach((p, i) => {
       const included = i < max;
       lines.push({ ...line(p), price: included ? (p.surcharge || 0) : p.price, included });
     });
   }
-  const subtotal = size.basePrice + lines.reduce((s, l) => s + l.price, 0);
-  return {
-    size: { id: size.id, name: size.name, nameEn: size.nameEn, serves: size.serves, servesEn: size.servesEn, basePrice: size.basePrice },
-    lines, subtotal,
-  };
+  return { lines, subtotal: size.basePrice + lines.reduce((s, l) => s + l.price, 0) };
 }
 
 function newOrderId() {
@@ -126,7 +143,7 @@ function buildWhatsappText(order, catalog) {
   const byCat = {};
   order.lines.forEach(l => (byCat[l.category] ||= []).push(l));
   let t = `*${m('newOrder')} ${order.id}* 🧀\n\n`;
-  t += `*${m('table')}:* ${loc(L, order.size)} (${loc(L, order.size, 'serves')}) - ${$(order.size.basePrice)}\n`;
+  t += `*${m('table')}:* ${loc(L, order.size)} (${loc(L, order.size, 'serves')}) - ${$(order.size.basePrice)}${order.pricedAs ? ` (= ${loc(L, order.pricedAs)})` : ''}\n`;
   for (const [cat, lines] of Object.entries(byCat)) {
     t += `\n*${loc(L, catalog.categories.find(c => c.id === cat)) || cat}:*\n`;
     lines.forEach(l => { t += `• ${loc(L, l)}${l.price ? ` (+${$(l.price)})` : ''}\n`; });
