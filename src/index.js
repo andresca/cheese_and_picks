@@ -6,7 +6,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import { createDb } from './db.js';
 import { verifyAccess } from './access.js';
-import { STATUSES, UserError, publicCatalog, createOrder, normalizeCatalog, computeStats } from './core.js';
+import { STATUSES, UserError, publicCatalog, createOrder, normalizeCatalog, normalizeOps, emptyOps, computeStats } from './core.js';
 
 const app = new Hono();
 
@@ -94,6 +94,17 @@ app.put('/api/admin/catalog', async c => {
   if (error) return c.json({ error }, 400);
   await c.get('db').saveCatalog(catalog);
   return c.json(catalog);
+});
+
+// Back office: providers, ingredients, recipes and costing settings.
+app.get('/api/admin/ops', async c => c.json((await c.get('db').getOps()) || emptyOps()));
+
+app.put('/api/admin/ops', async c => {
+  const ops = await readJson(c);
+  const error = normalizeOps(ops);
+  if (error) return c.json({ error }, 400);
+  await c.get('db').saveOps(ops);
+  return c.json(ops);
 });
 
 app.all('/api/*', c => c.json({ error: 'Not found' }, 404));

@@ -74,14 +74,15 @@ async function start() {
 
 function renderShell() {
   app.innerHTML = `<div class="tabs">
-      ${[['dashboard', 'tabDashboard'], ['orders', 'tabOrders'], ['catalog', 'tabCatalog'], ['settings', 'tabSettings']]
+      ${[['dashboard', 'tabDashboard'], ['orders', 'tabOrders'], ['catalog', 'tabCatalog'], ['ops', 'tabOps'], ['settings', 'tabSettings']]
         .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'active' : ''}">${t(l)}</button>`).join('')}
     </div><div id="view"></div>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => {
     if (tab === 'catalog' && b.dataset.tab !== 'catalog' && !(await leaveCatalog())) return;
+    if (tab === 'ops' && b.dataset.tab !== 'ops' && !(await leaveOps())) return;
     tab = b.dataset.tab; renderShell();
   });
-  ({ dashboard: renderDashboard, orders: renderOrders, catalog: renderCatalog, settings: renderSettings })[tab]();
+  ({ dashboard: renderDashboard, orders: renderOrders, catalog: renderCatalog, ops: renderOps, settings: renderSettings })[tab]();
 }
 const view = () => document.getElementById('view');
 

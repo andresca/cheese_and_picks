@@ -13,6 +13,15 @@ export function createDb(databaseUrl) {
       await sql.query('UPDATE catalog SET data = $1, updated_at = now() WHERE id = 1', [c]);
     },
 
+    async getOps() {
+      return (await one('SELECT data FROM ops WHERE id = 1'))?.data || null;
+    },
+    async saveOps(o) {
+      await sql.query(
+        `INSERT INTO ops (id, data) VALUES (1, $1)
+         ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [o]);
+    },
+
     async getOrders() {
       return (await sql.query('SELECT data FROM orders ORDER BY created_at DESC')).map(r => r.data);
     },

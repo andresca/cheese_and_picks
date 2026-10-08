@@ -80,6 +80,12 @@
     .pv-price { font-weight: 700; color: var(--accent); margin: 4px 0; }
     .warn { color: #b3261e; }
     @media (max-width: 800px) { .sc-body, .choice { grid-template-columns: 1fr; } .preview-card { position: static; } }
+    /* operations tab */
+    .ing-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+    .ing-grid .mlbl { font-size: .75rem; color: var(--muted); font-weight: 600; }
+    .rline { display: grid; grid-template-columns: minmax(140px, 1fr) 90px 36px auto; gap: 6px; align-items: center; }
+    .rline input, .rline select { padding: 6px 8px; }
+    @media (max-width: 800px) { .ing-grid { grid-template-columns: 1fr 1fr; } }
     .touch-only { display: none; }
     @media (hover: none) { .touch-only { display: inline-flex; gap: 2px; } .handle { display: none; } }
     @media (max-width: 800px) {
@@ -142,5 +148,6 @@
   <main class="container" id="app"></main>
   <script src="i18n.js"></script>
   <script src="admin.js"></script>
+  <script src="admin-ops.js"></script>
 </body>
 </html>

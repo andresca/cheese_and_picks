@@ -230,6 +230,46 @@ export function normalizeCatalog(c) {
   return null;
 }
 
+// ---------- back office (providers, ingredients, recipes) ----------
+export const UNITS = ['g', 'kg', 'ml', 'l', 'unit'];
+export const emptyOps = () => ({
+  providers: [], ingredients: [], recipes: {}, sizeRecipes: {},
+  costing: { laborPerHour: 0, overheadPct: 0, targetMarginPct: 60 },
+});
+
+export function normalizeOps(o) {
+  if (!o || !Array.isArray(o.providers) || !Array.isArray(o.ingredients)) return 'Invalid data';
+  const num = v => Math.max(0, Number(v) || 0);
+  const str = (v, n = 300) => String(v ?? '').slice(0, n);
+  o.providers = o.providers.map(p => ({
+    id: str(p.id, 40) || 'v' + randomHex(4), name: str(p.name, 120), contact: str(p.contact, 120),
+    phone: str(p.phone, 40), email: str(p.email, 120), address: str(p.address),
+    deliveryDays: str(p.deliveryDays, 120), leadDays: num(p.leadDays), minOrder: num(p.minOrder), notes: str(p.notes, 2000),
+  }));
+  const providerIds = new Set(o.providers.map(p => p.id));
+  o.ingredients = o.ingredients.map(i => ({
+    id: str(i.id, 40) || 'i' + randomHex(4), name: str(i.name, 120),
+    unit: UNITS.includes(i.unit) ? i.unit : 'g', stock: num(i.stock), minStock: num(i.minStock),
+    preferredProviderId: providerIds.has(i.preferredProviderId) ? i.preferredProviderId : '',
+    // A price offer: the provider sells packSize units (in the ingredient's unit) for packPrice.
+    offers: (Array.isArray(i.offers) ? i.offers : []).filter(f => providerIds.has(f.providerId)).map(f => ({
+      providerId: f.providerId, packSize: num(f.packSize) || 1, packPrice: num(f.packPrice), updatedAt: str(f.updatedAt, 30),
+    })),
+    notes: str(i.notes, 2000),
+  }));
+  const ingredientIds = new Set(o.ingredients.map(i => i.id));
+  // recipes: { productId: [{ ingredientId, qty }] } per portion; sizeRecipes: { sizeId: { mult, laborMin, items } }
+  const lines = arr => (Array.isArray(arr) ? arr : []).filter(l => ingredientIds.has(l.ingredientId))
+    .map(l => ({ ingredientId: l.ingredientId, qty: num(l.qty) }));
+  o.recipes = Object.fromEntries(Object.entries(o.recipes || {}).map(([k, v]) => [str(k, 40), lines(v)]));
+  o.sizeRecipes = Object.fromEntries(Object.entries(o.sizeRecipes || {}).map(([k, v]) => [str(k, 40), {
+    mult: Number(v?.mult) > 0 ? Number(v.mult) : 1, laborMin: num(v?.laborMin), items: lines(v?.items),
+  }]));
+  const c = o.costing || {};
+  o.costing = { laborPerHour: num(c.laborPerHour), overheadPct: num(c.overheadPct), targetMarginPct: Math.min(95, num(c.targetMarginPct)) };
+  return null;
+}
+
 export function computeStats(all) {
   const valid = all.filter(o => o.status !== 'cancelled');
   const revenue = valid.reduce((s, o) => s + o.total, 0);
