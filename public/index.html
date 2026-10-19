@@ -5,115 +5,336 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cheese Picks — Build your cheese table</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <style>
-    .stepper { display: flex; gap: 6px; margin: 24px 0; overflow-x: auto; padding-bottom: 4px; }
-    .stepper .s {
-      flex: 1; min-width: 92px; text-align: center; font-size: .8rem; color: var(--muted);
-      border-top: 4px solid var(--line); padding-top: 6px; white-space: nowrap;
+    /* Storefront: the page is the order ticket. Paper panels on a warm ground, one ink, wine as the accent. */
+    :root {
+      --ground: #ece1cf;
+      --paper: #fbf7f0;
+      --serif: "EB Garamond", Georgia, serif;
+      --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+      --step-body: clamp(1.125rem, 1.05rem + 0.3vw, 1.3125rem);
+      --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+      --step-head: clamp(2rem, 1.3rem + 3.2vw, 4rem);
+      --r: 4px;
+      --edge: 12px;
     }
-    .stepper .s.done { border-color: var(--gold); color: var(--ink); }
-    .stepper .s.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    body { background: var(--ground); font-family: var(--serif); font-size: var(--step-body); }
+    h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.01em; line-height: 1.1; }
+    .btn { border-radius: var(--r); font-family: var(--serif); font-size: var(--step-body); font-weight: 500; padding: 12px 26px; }
+    .btn.ghost { border-color: transparent; }
+    .muted { color: var(--muted); }
+    input, select, textarea { font-family: "Inter", system-ui, sans-serif; font-size: 1rem; border-radius: var(--r); background: var(--paper); }
+    label { font-family: var(--serif); font-weight: 500; font-size: 1rem; }
+    .stripe { display: flex; height: 56px; }
+    .stripe i { flex: 1; background: var(--accent); }
+    .stripe i:nth-child(even) { background: var(--paper); }
 
-    .layout { display: grid; grid-template-columns: 1fr 290px; gap: 20px; align-items: start; margin-bottom: 40px; }
-    @media (max-width: 1024px) { .layout { grid-template-columns: 1fr; } }
+    /* ---------- hero: the menu card beside the room ---------- */
+    .hero2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--edge); padding: var(--edge); min-height: 100svh; }
+    .hero2 .card2 {
+      background: var(--paper); border-radius: var(--r); overflow: hidden;
+      display: flex; flex-direction: column; text-align: center; position: relative;
+    }
+    .hero2 .card2 .body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 28px; gap: 18px; }
+    .hero2 .mark { font-size: var(--step-lead); font-style: italic; color: var(--accent); }
+    .hero2 h1 { font-size: clamp(2.5rem, 3.6vw, 3.5rem); font-style: italic; margin: 0; }
+    .hero2 p { max-width: 36ch; margin: 0; color: var(--muted); }
+    .hero2 .links { display: flex; gap: 28px; justify-content: center; padding: 0 20px 28px; font-size: 1rem; flex-wrap: wrap; }
+    .hero2 .links a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+    .hero2 .photo {
+      border-radius: var(--r); background: url("img/header-cheese.jpg") center 40% / cover no-repeat, var(--ink);
+      position: sticky; top: var(--edge); height: calc(100svh - 2 * var(--edge));
+    }
+    .langbox { position: absolute; top: 72px; right: 16px; }
+    .langsw { border-color: var(--line); }
+    .langsw button { color: var(--muted); font-family: var(--serif); font-size: 1rem; }
+    .langsw button.on { background: var(--ink); color: var(--paper); }
+
+    /* ---------- builder ---------- */
+    .builder { max-width: 1120px; margin: 0 auto; padding: 96px 16px 80px; }
+    .builder > h2 { font-size: var(--step-head); font-style: italic; margin-bottom: 8px; }
+    .stepper { display: flex; gap: 4px; margin: 28px 0 0; overflow-x: auto; scrollbar-width: none; }
+    .stepper .s {
+      flex: 1; min-width: 96px; text-align: center; font-size: 1rem; white-space: nowrap;
+      background: #e2d4bd; color: var(--muted); padding: 10px 8px 8px; border-radius: var(--r) var(--r) 0 0;
+    }
+    .stepper .s.done { background: #f1e8d8; color: var(--ink); }
+    .stepper .s.active { background: var(--paper); color: var(--accent); font-style: italic; }
+    html, body { overflow-x: clip; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
+    .layout > *, .builder > * { min-width: 0; }
+    .builder > h2 { overflow-wrap: break-word; }
+    #stepBody { background: var(--paper); border: 0; box-shadow: none; border-radius: 0 0 var(--r) var(--r); padding: 32px; }
+    #stepBody h2 { font-size: var(--step-lead); font-style: italic; }
+    #stepBody .grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 
     .option {
-      border: 2px solid var(--line); border-radius: var(--radius); padding: 16px; cursor: pointer;
-      background: #fff; transition: border-color .15s, transform .15s; position: relative; user-select: none;
+      border: 0; border-radius: var(--r); padding: 18px; cursor: pointer; background: #f3ebde;
+      transition: transform .2s, background .2s; position: relative; user-select: none;
     }
-    .option:hover { border-color: var(--gold); }
-    .option.selected { border-color: var(--accent); background: var(--accent-soft); }
+    .option:hover { background: #efe3d0; }
+    .option.selected { background: #fff; transform: rotate(-1deg); box-shadow: 0 6px 18px rgba(60, 40, 20, .12); }
     .option.disabled { opacity: .45; cursor: not-allowed; }
-    .option .price { font-weight: 700; color: var(--accent); }
+    .option .price { font-family: "Inter", system-ui, sans-serif; font-size: .95rem; font-weight: 600; color: var(--accent); margin-top: 6px; }
+    .option .muted { font-size: 1rem; }
     .option .check {
-      position: absolute; top: 10px; right: 12px; width: 22px; height: 22px; border-radius: 50%;
-      border: 2px solid var(--line); display: grid; place-items: center; font-size: .8rem; color: #fff;
+      position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 1rem; color: var(--gold);
+      border: 2px dashed var(--gold); transform: rotate(-12deg) scale(.6); opacity: 0; transition: .2s;
     }
-    .option.selected .check { background: var(--accent); border-color: var(--accent); }
-    .size-card h3 { font-size: 1.4rem; }
-    .size-card ul { padding-left: 18px; margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
-
-    .counter { margin: 4px 0 16px; font-weight: 600; }
-    .nav { display: flex; justify-content: space-between; margin-top: 22px; gap: 10px; }
-
-    .cart h3 { font-size: 1.15rem; }
-    .cart .line { display: flex; justify-content: space-between; font-size: .9rem; padding: 3px 0; gap: 8px; }
-    .cart .cat { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 10px; }
-    .cart .total { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; font-weight: 700; font-size: 1.1rem; }
-    .sticky { position: sticky; top: 16px; }
-
+    .option.selected .check { opacity: 1; transform: rotate(-12deg) scale(1); }
+    .size-card h3 { font-size: var(--step-lead); font-style: italic; }
+    .size-card ul { padding-left: 18px; margin: 8px 0 0; color: var(--muted); font-size: 1rem; }
+    .counter { margin: 4px 0 18px; font-style: italic; color: var(--accent); }
+    .nav { display: flex; justify-content: space-between; margin-top: 28px; gap: 10px; }
+    .seg { display: flex; gap: 10px; margin-bottom: 14px; }
+    .seg .option { flex: 1; text-align: center; padding: 14px; }
     .summary table { width: 100%; border-collapse: collapse; }
     .summary td { padding: 6px 0; border-bottom: 1px dashed var(--line); }
-    .summary td:last-child { text-align: right; }
-    .seg { display: flex; gap: 8px; margin-bottom: 14px; }
-    .seg .option { flex: 1; text-align: center; padding: 12px; }
-    .hero { text-align: center; padding: 30px 0 0; }
-    .hero p { max-width: 560px; margin: 0 auto; }
+    .summary td:last-child { text-align: right; font-family: "Inter", system-ui, sans-serif; font-size: .95rem; }
     .success { text-align: center; padding: 40px 20px; }
     .success .big { font-size: 3rem; }
 
+    /* The cart is the receipt: perforated top and bottom, typed lines. */
+    .cart {
+      background: #fff; border: 0; border-radius: 0; box-shadow: 0 10px 30px rgba(60, 40, 20, .12);
+      padding: 34px 26px; font-family: "Inter", system-ui, sans-serif; font-size: .95rem; position: relative;
+      --hole: radial-gradient(circle at 8px 0, transparent 6px, #000 6.5px);
+      -webkit-mask: var(--hole) top / 16px 51% repeat-x, radial-gradient(circle at 8px 100%, transparent 6px, #000 6.5px) bottom / 16px 51% repeat-x;
+              mask: var(--hole) top / 16px 51% repeat-x, radial-gradient(circle at 8px 100%, transparent 6px, #000 6.5px) bottom / 16px 51% repeat-x;
+    }
+    .cart h3 { font-family: var(--serif); font-size: var(--step-lead); font-style: italic; text-align: center; }
+    .cart .line { display: flex; justify-content: space-between; padding: 3px 0; gap: 8px; }
+    .cart .cat { margin-top: 12px; color: var(--muted); font-size: .85rem; }
+    .cart .cat::before { content: "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"; display: block; overflow: hidden; white-space: nowrap; color: var(--line); margin-bottom: 4px; }
+    .cart .total { border-top: 2px solid var(--ink); margin-top: 14px; padding-top: 10px; font-weight: 600; font-size: 1.1rem; }
+    .cart::after { content: attr(data-foot); display: block; text-align: center; margin-top: 16px; font-family: var(--serif); font-style: italic; color: var(--muted); font-size: 1rem; }
+    .sticky { position: sticky; top: 24px; }
+
+    /* ---------- showcase: order slips along the edge ---------- */
+    .show {
+      position: relative; min-height: 96svh; overflow: hidden; color: var(--paper);
+      background: linear-gradient(180deg, rgba(20, 12, 8, .55), rgba(20, 12, 8, .2) 60%), url("img/header-cheese.jpg") center / cover no-repeat, var(--ink);
+    }
+    .show .txt { position: relative; padding: 12svh 16px 0 18%; max-width: calc(18% + 34ch); }
+    .show .txt p { font-size: clamp(1.4rem, 1rem + 1.2vw, 2rem); line-height: 1.3; margin: 0 0 .6em; }
+    .show .txt p b { font-weight: 400; font-style: italic; }
+    .slips { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: flex-end; padding: 0 12px; }
+    .slip {
+      flex: 1; min-width: 0; background: var(--paper); color: var(--ink); padding: 18px 18px 0;
+      font-family: "Inter", system-ui, sans-serif; font-size: .9rem; line-height: 1.55; overflow: hidden;
+    }
+    .slip b { display: block; font-family: var(--serif); font-size: 1.15rem; font-style: italic; font-weight: 400; }
+    .slip .dash { color: var(--muted); overflow: hidden; white-space: nowrap; }
+    .slip:nth-child(1) { height: 34svh; } .slip:nth-child(2) { height: 42svh; transform: rotate(1.5deg); }
+    .slip:nth-child(3) { height: 28svh; } .slip:nth-child(4) { height: 44svh; transform: rotate(-1deg); }
+    .slip:nth-child(5) { height: 32svh; } .slip:nth-child(6) { height: 38svh; transform: rotate(1deg); }
+
+    /* ---------- how it works: a row of moments ---------- */
+    .how { padding: 96px 0; }
+    .how .top { display: flex; justify-content: space-between; align-items: end; gap: 16px; padding: 0 max(16px, 5vw); }
+    .how h2 { font-size: var(--step-head); font-style: italic; margin: 0; }
+    .how .arrows { display: flex; gap: 8px; }
+    .how .arrows button { width: 48px; height: 48px; border: 0; border-radius: var(--r); background: var(--ink); color: var(--paper); font-size: 1.2rem; cursor: pointer; }
+    .how .bar { height: 6px; background: #dccdb4; margin: 20px max(16px, 5vw) 32px; }
+    .how .bar i { display: block; height: 100%; width: 20%; background: var(--ink); transition: width .2s; }
+    .row { display: flex; gap: 32px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 max(16px, 5vw) 8px; scrollbar-width: none; }
+    .row::-webkit-scrollbar { display: none; }
+    .row::before, .row::after { content: ""; flex: 0 0 1px; }
+    /* Each moment is a paper card; wide enough that the row always scrolls on desktop. */
+    .moment {
+      flex: 0 0 min(380px, 80vw); scroll-snap-align: start; background: var(--paper);
+      padding: 28px 28px 28px; display: flex; flex-direction: column;
+    }
+    .moment h3 { font-size: var(--step-lead); font-style: italic; margin: 0 0 8px; }
+    .moment p { margin: 0; color: var(--muted); }
+    .moment .n { font-size: 2.25rem; line-height: 1; color: var(--accent); font-style: italic; display: block; margin-bottom: 12px; }
+    .moment img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; margin-top: auto; padding-top: 24px; box-sizing: content-box; width: 100%; }
+    .moment:nth-child(even of .moment) { transform: translateY(40px); }
+    .row { padding-bottom: 48px; scroll-padding-inline: max(16px, 5vw); }
+    .how.static .arrows, .how.static .bar { visibility: hidden; }
+
+    /* ---------- call to action: the reply card ---------- */
+    .cta {
+      background: var(--accent); color: var(--paper); min-height: 80svh; overflow: hidden;
+      display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; padding: 0 max(16px, 5vw); align-items: end;
+    }
+    .cta .side { grid-column: 1 / 5; font-size: clamp(1.25rem, 1rem + .6vw, 1.5rem); font-style: italic; margin: 0 0 64px; }
+    .cta .reply {
+      grid-column: 6 / 13; aspect-ratio: 7 / 5; background: var(--paper); color: var(--ink);
+      transform: rotate(2deg); margin-bottom: -60px; padding: 48px; text-align: center;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px;
+    }
+    .cta .reply h2 { font-size: 2rem; font-style: italic; margin: 0; }
+    .cta .reply p { margin: 0; max-width: 34ch; }
+    .cta .reply .btn { width: 100%; height: 56px; background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+    /* ---------- footer: the back of the card ---------- */
+    footer.back { padding: 96px 16px 48px; }
+    footer.back .panel {
+      max-width: 1000px; margin: 0 auto; background: var(--paper); padding: 72px 48px 24px; position: relative;
+      -webkit-mask: radial-gradient(circle at 50px 0, transparent 50px, #000 50.5px) top / 100px 100% repeat-x;
+              mask: radial-gradient(circle at 50px 0, transparent 50px, #000 50.5px) top / 100px 100% repeat-x;
+    }
+    footer.back .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+    footer.back h2 { font-size: 2rem; font-style: italic; }
+    footer.back .addr { display: flex; flex-direction: column; gap: 12px; padding-top: 110px; }
+    footer.back .addr a { color: var(--ink); font-size: 1.125rem; }
+    footer.back .stamp {
+      position: absolute; top: 56px; right: 48px; width: 88px; aspect-ratio: 3 / 4; padding: 6px; background: var(--paper);
+      box-shadow: 0 2px 8px rgba(60, 40, 20, .2); transform: rotate(4deg);
+    }
+    footer.back .stamp span { display: block; height: 100%; background: url("img/header-cheese.jpg") 30% 50% / cover; }
+    footer.back .credits { color: var(--muted); font-size: var(--step-small); text-align: center; margin: 40px 0 0; }
+    footer.back .credits a { color: var(--muted); }
+    footer.back .imprint { text-align: center; color: var(--muted); font-size: var(--step-small); margin-top: 12px; }
+    .stripe.thin { height: 8px; max-width: 1000px; margin: 0 auto 0; }
+
+    /* ---------- phone total = ticket stub ---------- */
     .mtotal { display: none; }
     @media (max-width: 1024px) {
+      .layout { grid-template-columns: minmax(0, 1fr); }
       .sticky { position: static; }
       .mtotal:not([hidden]) {
         display: flex; justify-content: space-between; align-items: center; gap: 10px;
         position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 5;
-        border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; cursor: pointer;
-        background: var(--ink); color: #f5ead8; box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+        border: 0; border-left: 2px dashed var(--line); border-radius: var(--r); padding: 14px 20px; font: inherit; cursor: pointer;
+        background: var(--paper); color: var(--ink); box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
       }
-      .mtotal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      main.container { padding-bottom: 72px; }
+      .mtotal b { font-family: "Inter", system-ui, sans-serif; color: var(--accent); }
+      .mtotal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+      .builder { padding-bottom: 96px; }
+      .cta .side { grid-column: 1 / 13; margin: 64px 0 0; }
+      .cta .reply { grid-column: 1 / 13; justify-self: center; width: 90%; transform: rotate(1deg); aspect-ratio: auto; padding: 36px 24px 56px; }
+      .cta { align-content: space-between; min-height: 0; gap: 32px; }
     }
-    /* Tablet: the side cart squeezes the step content, and fixed-width step labels overflow. */
-    @media (min-width: 601px) and (max-width: 1024px) {
-      .layout { grid-template-columns: 1fr; }
-      .sticky { position: static; }
-      .stepper { gap: 8px; overflow: visible; }
-      .stepper .s {
-        flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.25;
-        display: flex; align-items: flex-start; justify-content: center; padding: 8px 2px 0;
-      }
-      .grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-      .nav .btn { min-width: 140px; }
-    }
-    @media (max-width: 600px) {
-      .hero { padding-top: 22px; }
-      .hero h2 { font-size: 1.4rem; }
-      .stepper { margin: 18px -16px; padding: 0 16px 4px; scrollbar-width: none; }
-      .stepper .s { flex: none; min-width: 0; padding-left: 4px; padding-right: 4px; }
-      .layout { gap: 14px; }
-      .card { padding: 16px; }
-      .size-card h3 { font-size: 1.25rem; }
+    @media (max-width: 760px) {
+      .hero2 { grid-template-columns: 1fr; min-height: 0; }
+      .hero2 .photo { order: -1; position: static; height: 48svh; }
+      .hero2 .card2 { margin-top: -36px; margin-inline: 8px; }
+      .stripe { height: 40px; }
+      .hero2 h1 { font-size: 9vw; }
+      .langbox { top: 52px; right: 12px; }
+      .builder { padding-top: 64px; }
+      #stepBody { padding: 22px 16px; }
       .nav .btn { flex: 1; padding-left: 12px; padding-right: 12px; }
       .seg { flex-wrap: wrap; }
-      header.site.photo .langbox { top: 10px; right: 12px; }
+      .show { min-height: 100svh; }
+      .show .txt { padding: 10svh 16px 0; max-width: none; }
+      .show .txt p { font-size: 1.375rem; }
+      .slips { overflow-x: auto; scrollbar-width: none; }
+      .slip { flex: 0 0 42vw; font-size: .875rem; }
+      .how .arrows { display: none; }
+      .moment { flex-basis: 72vw; }
+      .row { gap: 16px; }
+      .moment .n { font-size: 3.5rem; }
+      .moment { padding: 20px; }
+      .moment:nth-child(even of .moment) { transform: translateY(24px); }
+      footer.back .panel { padding: 64px 22px 20px; -webkit-mask-size: 60px 100%; mask-size: 60px 100%;
+        -webkit-mask-image: radial-gradient(circle at 30px 0, transparent 30px, #000 30.5px);
+                mask-image: radial-gradient(circle at 30px 0, transparent 30px, #000 30.5px); }
+      footer.back .cols { grid-template-columns: 1fr; gap: 8px; }
+      footer.back .addr { padding-top: 0; }
+      footer.back .addr a { font-size: 1.0625rem; }
+      footer.back .stamp { width: 64px; top: 40px; right: 20px; }
+      footer.back h2 { padding-right: 76px; }
     }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
 <body>
-  <header class="site photo">
-    <div class="container">
-      <div class="brand"><span class="eyebrow">Fromagerie &amp; Vin</span><h1 id="bizName">Cheese Picks</h1><span class="rule"></span><small data-i18n="tagline"></small></div>
+  <header class="hero2">
+    <div class="card2">
+      <div class="stripe" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div id="langBox" class="langbox"></div>
+      <div class="body">
+        <div class="mark" id="bizName">Cheese Picks</div>
+        <h1><span data-i18n="heroLine1"></span><br><span data-i18n="heroLine2"></span></h1>
+        <p data-i18n="heroText"></p>
+        <a class="btn" href="#builder" data-i18n="startCta"></a>
+      </div>
+      <nav class="links">
+        <a href="#how" data-i18n="linkHow"></a>
+        <a href="#builder" data-i18n="linkOrder"></a>
+        <a href="#contact" data-i18n="linkContact"></a>
+      </nav>
     </div>
+    <div class="photo" role="img" aria-label="Cheese board with fruit and wine"></div>
   </header>
 
-  <main class="container">
-    <div class="hero">
+  <main>
+    <section class="builder" id="builder">
       <h2 data-i18n="heroTitle"></h2>
-      <p class="muted" data-i18n="heroText"></p>
-    </div>
-    <div class="stepper" id="stepper"></div>
-    <div class="layout">
-      <section class="card" id="stepBody"></section>
-      <aside class="card cart sticky" id="cart"></aside>
-    </div>
+      <p class="muted" data-i18n="tagline"></p>
+      <div class="stepper" id="stepper"></div>
+      <div class="layout">
+        <section class="card" id="stepBody"></section>
+        <aside class="card cart sticky" id="cart"></aside>
+      </div>
+    </section>
+
+    <section class="show" id="show">
+      <div class="txt">
+        <p><b data-i18n="showTitle"></b></p>
+        <p data-i18n="showText"></p>
+      </div>
+      <div class="slips" id="slips"></div>
+    </section>
+
+    <section class="how" id="how">
+      <div class="top">
+        <h2 data-i18n="howTitle"></h2>
+        <div class="arrows">
+          <button type="button" aria-label="Back" data-dir="-1">←</button>
+          <button type="button" aria-label="Forward" data-dir="1">→</button>
+        </div>
+      </div>
+      <div class="bar"><i id="howBar"></i></div>
+      <div class="row" id="howRow">
+        <article class="moment"><span class="n">i</span><h3 data-i18n="how1t"></h3><p data-i18n="how1d"></p><img src="img/how-1.jpg" alt="" width="900" height="1125" loading="lazy"></article>
+        <article class="moment"><span class="n">ii</span><h3 data-i18n="how2t"></h3><p data-i18n="how2d"></p><img src="img/how-2.jpg" alt="" width="900" height="1125" loading="lazy"></article>
+        <article class="moment"><span class="n">iii</span><h3 data-i18n="how3t"></h3><p data-i18n="how3d"></p><img src="img/how-3.jpg" alt="" width="900" height="1125" loading="lazy"></article>
+        <article class="moment"><span class="n">iv</span><h3 data-i18n="how4t"></h3><p data-i18n="how4d"></p><img src="img/how-4.webp" alt="" width="900" height="1125" loading="lazy"></article>
+        <article class="moment"><span class="n">v</span><h3 data-i18n="how5t"></h3><p data-i18n="how5d"></p><img src="img/how-5.jpg" alt="" width="900" height="1125" loading="lazy"></article>
+      </div>
+    </section>
+
+    <section class="cta">
+      <p class="side" data-i18n="ctaSide"></p>
+      <div class="reply">
+        <h2 data-i18n="ctaTitle"></h2>
+        <p data-i18n="ctaText"></p>
+        <a class="btn" href="#builder" data-i18n="startCta"></a>
+      </div>
+    </section>
   </main>
+
+  <footer class="back" id="contact">
+    <div class="stripe thin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="panel">
+      <div class="stamp" aria-hidden="true"><span></span></div>
+      <div class="cols">
+        <div>
+          <h2 data-i18n="footSign"></h2>
+          <p class="muted" data-i18n="footText"></p>
+        </div>
+        <div class="addr">
+          <a id="footWa" href="#" target="_blank" rel="noopener" data-i18n="footWa"></a>
+          <a href="#builder" data-i18n="startCta"></a>
+        </div>
+      </div>
+      <p class="credits">Fotos de los pasos: <a href="https://commons.wikimedia.org/w/index.php?curid=196560809">Bapak Alex</a> (CC BY 4.0), <a href="https://commons.wikimedia.org/w/index.php?curid=178503892">DimiTalen</a> (CC0), <a href="https://commons.wikimedia.org/w/index.php?curid=71359001">RightCowLeftCoast</a> (CC BY-SA 4.0), <a href="https://www.rawpixel.com/image/5922530">rawpixel</a> (CC0), <a href="https://commons.wikimedia.org/w/index.php?curid=82674263">Bretwa</a> (CC BY-SA 4.0), vía Wikimedia Commons.</p>
+      <div class="imprint">© <span id="year"></span> <span id="footName">Cheese Picks</span></div>
+    </div>
+  </footer>
+
   <button type="button" class="mtotal" id="mtotal" hidden onclick="document.getElementById('cart').scrollIntoView({ behavior: 'smooth' })"></button>
 
-  <script src="i18n.js"></script>
-  <script src="app.js"></script>
+  <script src="i18n.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

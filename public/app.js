@@ -220,6 +220,7 @@ function renderSummary() {
 function renderCart() {
   const s = size();
   const el = document.getElementById('cart');
+  el.dataset.foot = t('ticketFoot');
   const bar = document.getElementById('mtotal');
   if (!s) { el.innerHTML = `<h3>${t('yourTable')}</h3><p class="muted">${t('chooseToStart')}</p>`; bar.hidden = true; return; }
   const tt = totals();
@@ -275,7 +276,7 @@ function bind(cur) {
   body.querySelectorAll('input, textarea').forEach(el => el.oninput = () => { state.customer[el.id] = el.value; });
 
   const back = body.querySelector('[data-act=back]');
-  if (back) back.onclick = () => { saveForm(); state.step--; render(); scrollTo({ top: 0, behavior: 'smooth' }); };
+  if (back) back.onclick = () => { saveForm(); state.step--; render(); toBuilder(); };
   const next = body.querySelector('[data-act=next]');
   next.onclick = async () => {
     if (cur.key === 'details') {
@@ -292,8 +293,46 @@ function bind(cur) {
     if (cur.key === 'summary') return submit(next);
     state.step++;
     render();
-    scrollTo({ top: 0, behavior: 'smooth' });
+    toBuilder();
   };
+}
+
+const toBuilder = () => document.getElementById('builder').scrollIntoView({ behavior: 'smooth' });
+
+// Sample tickets for the showcase, built from the real catalog: each size with the first picks per category.
+function renderSlips() {
+  const sizes = catalog.sizes.filter(s => s.active !== false && !s.custom);
+  const slips = [];
+  for (let i = 0; i < 6 && sizes.length; i++) {
+    const s = sizes[i % sizes.length];
+    const lines = catalog.categories.flatMap(cat => {
+      const items = catalog.products.filter(p => p.category === cat.id && p.active !== false);
+      const n = Math.min(cat.limited ? s.limits?.[cat.id] ?? 0 : (i % 2), items.length);
+      return Array.from({ length: n }, (_, k) => items[(k + i) % items.length]);
+    });
+    slips.push(`<div class="slip"><b>${esc(tr(s))} · ${money(s.basePrice)}</b><div class="dash">- - - - - - - - - - - - - - - - - - - -</div>${lines.slice(0, 8).map(p => esc(tr(p))).join('<br>')}</div>`);
+  }
+  document.getElementById('slips').innerHTML = slips.join('');
+}
+
+function bindPage() {
+  const row = document.getElementById('howRow'), bar = document.getElementById('howBar');
+  const update = () => {
+    const max = row.scrollWidth - row.clientWidth;
+    row.closest('.how').classList.toggle('static', max <= 1);
+    bar.style.width = (max > 0 ? 20 + 80 * row.scrollLeft / max : 100) + '%';
+  };
+  row.addEventListener('scroll', update, { passive: true });
+  addEventListener('resize', update);
+  update();
+  document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => {
+    const step = row.querySelector('.moment').offsetWidth + 32;
+    row.scrollBy({ left: b.dataset.dir * step, behavior: 'smooth' });
+  });
+  const st = catalog.settings;
+  document.getElementById('footWa').href = `https://wa.me/${encodeURIComponent(st.whatsappNumber || '')}`;
+  document.getElementById('footName').textContent = st.businessName;
+  document.getElementById('year').textContent = new Date().getFullYear();
 }
 
 const isLastCategory = cat => catalog.categories[catalog.categories.length - 1].id === cat.id;
@@ -363,7 +402,10 @@ async function submit(btn) {
     saveForm();
     applyLang(b.dataset.lang);
     if (!done) render();
+    renderSlips();
   });
+  bindPage();
   applyLang(LANG);
   render();
+  try { renderSlips(); } catch (e) { console.error(e); }
 })();
